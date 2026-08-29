@@ -26,11 +26,13 @@ services:
   api:
     build: ./api
     restart: unless-stopped
-    env_file: .env
     environment:
       - PORT=3000            # internal port (nginx proxies here) — do not change
       - DATA_DIR=/data
       - COACH_CODEX_HOME=/codex
+      - RP_ID=${RP_ID}
+      - ORIGIN=${ORIGIN}
+      - RP_NAME=${RP_NAME}
     volumes:
       - ./data:/data         # users, passkeys, per-user state, session secret — BACK THIS UP
       # ChatGPT/Codex refresh tokens are kept separate from app data and mounted only into the
