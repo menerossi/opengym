@@ -33,6 +33,8 @@ services:
       - RP_ID=${RP_ID}
       - ORIGIN=${ORIGIN}
       - RP_NAME=${RP_NAME}
+      - ADMIN_UIDS=${ADMIN_UIDS}
+      - INVITE_ONLY=${INVITE_ONLY}
     volumes:
       - ./data:/data         # users, passkeys, per-user state, session secret — BACK THIS UP
       # ChatGPT/Codex refresh tokens are kept separate from app data and mounted only into the
