@@ -104,6 +104,40 @@ test('legacy Claude credentials are disabled until replaced with a setup token',
   assert.throws(() => auth.setApiKey('sk-ant-key'), /setup token/);
 });
 
+test('OpenRouter provider appears in the provider list and can be configured', () => {
+  assert.ok(cfg.PROVIDERS.openrouter, 'openrouter provider is registered');
+  assert.equal(cfg.PROVIDERS.openrouter.label, 'OpenRouter');
+  assert.equal(cfg.PROVIDERS.openrouter.apiKeyEnv, 'OPENROUTER_API_KEY');
+  assert.equal(cfg.PROVIDERS.openrouter.setupToken, false);
+  assert.equal(cfg.PROVIDERS.openrouter.deviceLogin, false);
+});
+
+test('OpenRouter API key is encrypted and reaches only the job environment', () => {
+  cfg.save({ enabled: true, provider: 'openrouter', auth: null });
+  auth.setApiKey('sk-or-v1-test-key');
+  assert.equal(cfg.isConnected(), true);
+  assert.equal(auth.authStatus().state, 'connected');
+  assert.equal(auth.authStatus().type, 'apikey');
+
+  process.env.RP_ID = 'gym.example.com';
+  process.env.ADMIN_UIDS = 'someadmin';
+  const env = cfg.jobEnv('/tmp/jobdir');
+  assert.equal(env.OPENROUTER_API_KEY, 'sk-or-v1-test-key');
+  assert.equal(env.RP_ID, undefined, 'nothing is inherited from this process');
+  assert.equal(env.ADMIN_UIDS, undefined);
+
+  const onDisk = fs.readFileSync(`${DIR}/coach.json`, 'utf8');
+  assert.ok(!onDisk.includes('sk-or-v1-test-key'), 'the key is not sitting in the file in the clear');
+});
+
+test('OpenRouter disconnect clears the credential', async () => {
+  cfg.save({ enabled: true, provider: 'openrouter', auth: { type: 'apikey', data: cfg.encrypt({ token: 'sk-or-v1-test' }) } });
+  assert.equal(cfg.isConnected(), true);
+  await auth.disconnect();
+  assert.equal(cfg.isConnected(), false);
+  assert.equal(auth.authStatus().state, 'disconnected');
+});
+
 test('the instance job log records outcomes, never contents', () => {
   cfg.save({ log: [] });
   cfg.logJob({ at: new Date().toISOString(), uid: 'u1', kind: 'review', outcome: 'ready', ms: 1200 });
