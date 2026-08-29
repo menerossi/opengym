@@ -39,6 +39,7 @@ No account on someone else's server, no subscription, no ads. Just `docker compo
 > **→ [What it does and how to use it](docs/AI_COACH.md)** ·
 > [Claude setup](Claude-setup-instructions.md) ·
 > [ChatGPT / Codex setup](ChatGPT-setup-instructions.md) ·
+> [OpenRouter](docs/AI_COACH.md#providers) ·
 > [design deck (PDF)](openGym_AI_Strategy.pdf)
 
 <br>
@@ -89,11 +90,11 @@ as a home-screen app, passkey sign-in, offline support, sync across your phone a
 - 🟩 **Activity heatmap** — a GitHub-style year view, shaded by time spent training
 - 💪 **Muscle map** — a front-and-back body diagram shaded by how much work each muscle got, over a week, a month or all time. It names the muscles you *haven't* trained in that period, previews what a routine hits while you build it, and shows what you just trained when you finish. Male or female figure, your pick
 - 🔔 **Push notifications** — rest-timer alerts even with the app closed, plus an optional reminder on days you have a workout planned but haven't logged one. Opt in per profile; keys are generated on first run, nothing to configure
-- 🤖 **AI Coach** (optional) — an AI that *designs* your plan and adjusts it from what you actually log. A short intake produces a complete weekly plan you can refine in plain language; on demand or on a schedule it reads your stalls, effort ratings, adherence and body-weight trend and proposes **discrete, explained changes** you accept one by one. Choose the official Claude Agent SDK or the bundled OpenAI Codex CLI with ChatGPT device-code sign-in; it is off until the instance owner enables it, needs each profile's separate consent, and never changes anything without your approval — every change-set is snapshotted and revertible. The progression engine still owns your session-to-session weights. **[Full guide →](docs/AI_COACH.md)**
+- 🤖 **AI Coach** (optional) — an AI that *designs* your plan and adjusts it from what you actually log. A short intake produces a complete weekly plan you can refine in plain language; on demand or on a schedule it reads your stalls, effort ratings, adherence and body-weight trend and proposes **discrete, explained changes** you accept one by one. Choose the official Claude Agent SDK, the bundled OpenAI Codex CLI with ChatGPT device-code sign-in, or the OpenRouter REST API with any provider key you already have; it is off until the instance owner enables it, needs each profile's separate consent, and never changes anything without your approval — every change-set is snapshotted and revertible. The progression engine still owns your session-to-session weights. **[Full guide →](docs/AI_COACH.md)**
 - 🔑 **Passkeys, not passwords** — Face ID / Touch ID / fingerprint login; each profile keeps its own data, synced across devices
 - 🛠️ **Admin dashboard** (optional) — for whoever runs the instance: who's training right now, per-user history, disable accounts, and invite-only signup. Off by default, so a fresh instance stays open with no admin
 - 🎨 **Designed, not assembled** — light/dark themes and 8 accent colors saved to your profile, over a hand-drawn icon set instead of emoji, so it looks the same on every phone
-- 🌍 **12 languages** — full UI translation (EN, DE, ES, FR, IT, PT, PL, TR, RU, ZH, KO, HI); exercise instructions localized in 10 of them, loaded on demand so the app stays fast
+- 🌍 **13 languages** — full UI translation (EN, DE, ES, FR, IT, PT, PT-BR, PL, TR, RU, ZH, KO, HI); exercise instructions localized in 10 of them, loaded on demand so the app stays fast
 - 📥 **Bring your history with you** — import from **FitNotes** (Android and iOS), **Strong** and **Hevy**, or body weight straight out of an **Apple Health** export. Exercise names are matched against the library and anything unrecognised becomes one of your own exercises, so nothing in the file is dropped
 - 📦 **Yours to keep** — one-tap JSON export/import, guest mode, **no telemetry**
 - 📱 **Standalone Android app** — the whole tracker as a sideloadable APK: no account, no server, data on the phone, native workout reminders ([download](https://opengym.duarte-santos.ch))
@@ -173,9 +174,10 @@ All via `.env` (see `.env.example`):
 
 Push notification keys are generated on first run and saved to `./data/vapid.json` — nothing to set.
 
-The **AI Coach** needs no `.env` at all: Claude's Agent SDK and a pinned OpenAI Codex CLI ship
-inside the api image. An admin can add a Claude Code setup token or complete Codex's ChatGPT
-device-code sign-in in the dashboard. See [the AI Coach guide](docs/AI_COACH.md),
+The **AI Coach** needs no `.env` at all: Claude's Agent SDK, a pinned OpenAI Codex CLI, and the
+OpenRouter REST adapter all ship inside the api image. An admin can add a Claude Code setup token,
+complete Codex's ChatGPT device-code sign-in, or paste an OpenRouter API key in the dashboard.
+See [the AI Coach guide](docs/AI_COACH.md),
 [the self-hosting guide](docs/SELF_HOSTING.md#8-the-ai-coach-optional), and the setup
 walkthroughs for [Claude](Claude-setup-instructions.md) and [ChatGPT/Codex](ChatGPT-setup-instructions.md).
 
