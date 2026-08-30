@@ -124,10 +124,10 @@ export default function AdminCoach() {
       <h4 className="sec">Limits</h4>
       <div className="row" style={{ gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
         <label className="small muted">Per user / day
-          <input className="num" type="number" min="0" max="200" defaultValue={d.caps.perProfileDaily} style={{ width: 70, marginLeft: 8 }}
+          <input className="field" type="number" min="0" max="200" defaultValue={d.caps.perProfileDaily} style={{ width: 70, marginLeft: 8, padding: '7px 9px' }}
             onBlur={e => patch({ caps: { ...d.caps, perProfileDaily: +e.target.value } })} /></label>
         <label className="small muted">Whole instance / day
-          <input className="num" type="number" min="0" max="5000" defaultValue={d.caps.instanceDaily} style={{ width: 70, marginLeft: 8 }}
+          <input className="field" type="number" min="0" max="5000" defaultValue={d.caps.instanceDaily} style={{ width: 70, marginLeft: 8, padding: '7px 9px' }}
             onBlur={e => patch({ caps: { ...d.caps, instanceDaily: +e.target.value } })} /></label>
       </div>
       <div className="dim small" style={{ marginBottom: 10 }}>0 = no limit. Every job is one session on your provider account.</div>
