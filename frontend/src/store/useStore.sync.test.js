@@ -9,6 +9,7 @@ globalThis.localStorage = {
 }
 globalThis.document = { visibilityState: 'visible', addEventListener: vi.fn() }
 globalThis.window = { addEventListener: vi.fn() }
+globalThis.BroadcastChannel = undefined
 
 const api = vi.fn()
 vi.mock('../lib/api.js', () => ({ api }))

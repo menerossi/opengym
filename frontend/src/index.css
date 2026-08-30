@@ -290,6 +290,14 @@ h4.sec{
 #tabbar button .icn{font-size:25px;--icon-stroke:1.65;color:var(--label)}
 #tabbar button.on{color:var(--acc)}
 #tabbar button.on .icn{--icon-stroke:2;color:inherit;opacity:1}
+#tabbar button[class*="sync-"]{position:relative}
+#tabbar button[class*="sync-"]::after{
+  content:'';position:absolute;top:1px;left:calc(50% + 8px);width:7px;height:7px;
+  border-radius:50%;background:var(--orange);box-shadow:0 0 0 2px var(--bg-el);
+}
+#tabbar button.sync-conflict::after{background:var(--red)}
+#tabbar button.sync-syncing::after{background:var(--acc);animation:syncpulse 1s ease-in-out infinite alternate}
+@keyframes syncpulse{to{opacity:.3;transform:scale(.75)}}
 #tabbar button.start{margin-top:-24px}
 #tabbar button.start .cir{
   width:52px;height:52px;border-radius:50%;background:var(--acc);color:var(--on-acc);

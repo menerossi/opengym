@@ -4,9 +4,11 @@ import { localTZ } from '../lib/format.js'
 import { registerCustom } from '../lib/exercise-registry.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
 import { MOBILE, nativeLoad, nativeSave, syncReminder } from '../lib/mobile.js'
+import { mergeStates } from '../lib/sync-merge.js'
 
 const KEY = 'gym_state_v1'
 const REV_KEY = 'gym_sync_revision_v1'
+const BASE_KEY = 'gym_sync_base_v1'
 export const DEF = {
   unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: 'en',
   theme: 'dark', accent: 'lime', body: 'male', targetW: null,
@@ -39,6 +41,10 @@ export const useStore = create((set, get) => {
   let saveTm = null
   let pushRun = null
   let changeSeq = 0
+  const syncChannel = !MOBILE && typeof BroadcastChannel !== 'undefined'
+    ? new BroadcastChannel('opengym-sync-v1') : null
+  const serverCopy = state => { const out = clone(state); delete out.active; return out }
+  const rememberBase = state => localStorage.setItem(BASE_KEY, JSON.stringify(serverCopy(state)))
 
   // Mobile build: mirror the state into a file in the app's data directory (survives WebView
   // storage eviction) and keep the native reminder schedule in step with the weekly plan.
@@ -84,6 +90,9 @@ export const useStore = create((set, get) => {
     }
   })
   window.addEventListener('online', () => { if (get().user) get().pullState() })
+  if (syncChannel) syncChannel.onmessage = e => {
+    if (e.data?.type === 'synced' && get().user && e.data.userId === get().user.id) get().pullState()
+  }
 
   // Everything a sign-out leaves behind on this device, whichever way it was triggered.
   const clearLocalSession = () => {
@@ -91,6 +100,7 @@ export const useStore = create((set, get) => {
     localStorage.removeItem('gym_guest')
     localStorage.removeItem('gym_dirty')
     localStorage.removeItem(REV_KEY)
+    localStorage.removeItem(BASE_KEY)
     localStorage.removeItem(KEY)
     persist(clone(DEF), false)
   }
@@ -141,8 +151,18 @@ export const useStore = create((set, get) => {
             })
             if (result.revision) localStorage.setItem(REV_KEY, result.revision)
             else localStorage.removeItem(REV_KEY)
-            if (sentSeq === changeSeq) localStorage.removeItem('gym_dirty')
+            rememberBase(state)
+            let stored = null
+            try { stored = JSON.parse(localStorage.getItem(KEY)) } catch { /* keep dirty */ }
+            const anotherTabChanged = stored && JSON.stringify(serverCopy(stored)) !== JSON.stringify(serverCopy(state))
+            if (sentSeq === changeSeq && !anotherTabChanged) localStorage.removeItem('gym_dirty')
+            else if (anotherTabChanged) {
+              const active = get().S.active
+              if (active) stored.active = active
+              persist(stored, false)
+            }
             set({ syncStatus: 'idle' })
+            syncChannel?.postMessage({ type: 'synced', userId: get().user?.id })
           } catch (e) {
             synced = false
             localStorage.setItem('gym_dirty', '1')
@@ -163,6 +183,22 @@ export const useStore = create((set, get) => {
         // Both sides changed since the last successful sync. Keep the local copy intact and make
         // the conflict visible in state; never choose a winner using untrusted device clocks.
         if (dirty && revision !== baseRevision) {
+          let base = null
+          try { base = JSON.parse(localStorage.getItem(BASE_KEY)) } catch { /* pre-revision client */ }
+          if (base && state) {
+            const merged = mergeStates(base, S, state)
+            if (!merged.conflicts.length) {
+              const active = S.active
+              const next = Object.assign(clone(DEF), merged.state)
+              if (active) next.active = active
+              persist(next, false)
+              localStorage.setItem(REV_KEY, revision)
+              rememberBase(state)
+              localStorage.setItem('gym_dirty', '1')
+              await get().pushState()
+              return
+            }
+          }
           set({ syncStatus: 'conflict' })
           return
         }
@@ -172,6 +208,7 @@ export const useStore = create((set, get) => {
           if (active) next.active = active
           persist(next, false)
           localStorage.removeItem('gym_dirty')
+          rememberBase(state)
         }
         if (revision) localStorage.setItem(REV_KEY, revision)
         else localStorage.removeItem(REV_KEY)
@@ -192,6 +229,7 @@ export const useStore = create((set, get) => {
           if (revision) localStorage.setItem(REV_KEY, revision)
           else localStorage.removeItem(REV_KEY)
           localStorage.removeItem('gym_dirty')
+          rememberBase(state || {})
           set({ syncStatus: 'idle' })
           return true
         }

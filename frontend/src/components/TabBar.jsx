@@ -12,6 +12,7 @@ export default function TabBar() {
   const dayPlan = useStore(s => s.S.dayPlan)
   const routines = useStore(s => s.S.routines)
   const user = useStore(s => s.user)
+  const syncStatus = useStore(s => s.syncStatus)
   const isGuest = useStore(s => s.isGuest())
   if (!user && !isGuest) return null
   const cur = loc.pathname.split('/')[1] || 'home'
@@ -33,7 +34,8 @@ export default function TabBar() {
     nav('/workout')
   }
   const Tab = ({ k, icon, to, label }) => (
-    <button className={on(k) ? 'on' : ''} onClick={() => nav(to)}>
+    <button className={(on(k) ? 'on' : '') + (k === 'home' && user && syncStatus !== 'idle' ? ` sync-${syncStatus}` : '')}
+      onClick={() => nav(k === 'home' && syncStatus === 'conflict' ? '/settings' : to)}>
       <Icon name={icon} /><span>{label}</span>
     </button>
   )
