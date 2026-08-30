@@ -60,6 +60,12 @@ const stateFile = uid => path.join(DATA, 'state-' + uid.replace(/[^a-zA-Z0-9_-]/
 function readState(uid) {
   try { return JSON.parse(fs.readFileSync(stateFile(uid), 'utf8')); } catch { return null; }
 }
+// Revisions are derived from the bytes on disk, so existing state files need no migration and a
+// server restart cannot forget the concurrency token. Clients must present the revision they last
+// read; this turns a silent last-write-wins overwrite into an explicit, recoverable conflict.
+const stateRevision = state => state == null
+  ? null
+  : crypto.createHash('sha256').update(JSON.stringify(state)).digest('base64url');
 
 /* ---------- push notifications (Web Push / VAPID) ---------- */
 const vapidFile = path.join(DATA, 'vapid.json');
@@ -395,8 +401,8 @@ const routes = {
     if (!user) return json(res, 401, { error: 'not signed in' });
     try {
       const state = JSON.parse(fs.readFileSync(stateFile(user.id), 'utf8'));
-      json(res, 200, { state });
-    } catch { json(res, 200, { state: null }); }
+      json(res, 200, { state, revision: stateRevision(state) });
+    } catch { json(res, 200, { state: null, revision: null }); }
   },
 
   'PUT /api/data': async (req, res) => {
@@ -404,9 +410,17 @@ const routes = {
     if (!user) return json(res, 401, { error: 'not signed in' });
     const body = await readBody(req);
     if (!body.state || typeof body.state !== 'object') return json(res, 400, { error: 'state required' });
+    if (!Object.prototype.hasOwnProperty.call(body, 'baseRevision')) {
+      return json(res, 428, { error: 'sync revision required' });
+    }
+    const current = readState(user.id);
+    const currentRevision = stateRevision(current);
+    if (body.baseRevision !== currentRevision) {
+      return json(res, 409, { error: 'sync conflict', revision: currentRevision });
+    }
     delete body.state.active;              // in-progress workouts stay device-local
     atomicWrite(stateFile(user.id), JSON.stringify(body.state));
-    json(res, 200, { ok: true, ts: body.state._ts || null });
+    json(res, 200, { ok: true, ts: body.state._ts || null, revision: stateRevision(body.state) });
   },
 
   'GET /api/push/public-key': async (req, res) => json(res, 200, { key: vapid.publicKey }),

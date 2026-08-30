@@ -6,6 +6,7 @@ import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
 import { MOBILE, nativeLoad, nativeSave, syncReminder } from '../lib/mobile.js'
 
 const KEY = 'gym_state_v1'
+const REV_KEY = 'gym_sync_revision_v1'
 export const DEF = {
   unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: 'en',
   theme: 'dark', accent: 'lime', body: 'male', targetW: null,
@@ -36,6 +37,8 @@ const hasData = st => !!((st.workouts || []).length || (st.routines || []).lengt
 export const useStore = create((set, get) => {
   let pushTm = null
   let saveTm = null
+  let pushRun = null
+  let changeSeq = 0
 
   // Mobile build: mirror the state into a file in the app's data directory (survives WebView
   // storage eviction) and keep the native reminder schedule in step with the weekly plan.
@@ -46,11 +49,15 @@ export const useStore = create((set, get) => {
 
   const persist = (S, push = true) => {
     S._ts = Date.now()
+    changeSeq++
     registerCustom(S.customEx)
     localStorage.setItem(KEY, JSON.stringify(S))
     set({ S })
     if (MOBILE) nativePersist()
     if (push && get().user) {
+      // Mark pending immediately, not when the network request fails. A tab can be killed during
+      // the debounce window and must still know on the next boot that its local state is newer.
+      localStorage.setItem('gym_dirty', '1')
       clearTimeout(pushTm)
       pushTm = setTimeout(() => get().pushState(), 1500)
     }
@@ -61,7 +68,10 @@ export const useStore = create((set, get) => {
   // same applies to the file mirror — backgrounding is often the last thing before the OS
   // kills the app.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'hidden') return
+    if (document.visibilityState !== 'hidden') {
+      if (get().user) get().pullState()
+      return
+    }
     if (MOBILE && saveTm) {
       clearTimeout(saveTm)
       saveTm = null
@@ -73,12 +83,14 @@ export const useStore = create((set, get) => {
       get().pushState()
     }
   })
+  window.addEventListener('online', () => { if (get().user) get().pullState() })
 
   // Everything a sign-out leaves behind on this device, whichever way it was triggered.
   const clearLocalSession = () => {
     get().setUser(null)
     localStorage.removeItem('gym_guest')
     localStorage.removeItem('gym_dirty')
+    localStorage.removeItem(REV_KEY)
     localStorage.removeItem(KEY)
     persist(clone(DEF), false)
   }
@@ -87,6 +99,7 @@ export const useStore = create((set, get) => {
     S: (() => { const s = loadState(); registerCustom(s.customEx); return s })(),
     user: (() => { try { return JSON.parse(localStorage.getItem('gym_user')) || null } catch { return null } })(),
     ready: false,
+    syncStatus: 'idle', // idle | syncing | offline | conflict
     // Instance capabilities from GET /api/config. `config.coach` is present only when the
     // owner has both enabled the Coach and connected a provider — every Coach entry point in
     // the app hangs off it, so an unconfigured instance renders exactly what it always did.
@@ -112,25 +125,65 @@ export const useStore = create((set, get) => {
     async pushState() {
       if (!get().user) return
       clearTimeout(pushTm)
-      try { await api('/api/data', { method: 'PUT', body: JSON.stringify({ state: get().S }) }); localStorage.removeItem('gym_dirty') }
-      catch (e) { localStorage.setItem('gym_dirty', '1') }
+      // Coalesce all callers into one serialized upload loop. If state changes while a request is
+      // in flight, the loop sends the newer snapshot only after the older request has settled.
+      if (pushRun) return pushRun
+      pushRun = (async () => {
+        let synced = true
+        do {
+          const sentSeq = changeSeq
+          const state = clone(get().S)
+          const baseRevision = localStorage.getItem(REV_KEY)
+          set({ syncStatus: 'syncing' })
+          try {
+            const result = await api('/api/data', {
+              method: 'PUT', body: JSON.stringify({ state, baseRevision })
+            })
+            if (result.revision) localStorage.setItem(REV_KEY, result.revision)
+            else localStorage.removeItem(REV_KEY)
+            if (sentSeq === changeSeq) localStorage.removeItem('gym_dirty')
+            set({ syncStatus: 'idle' })
+          } catch (e) {
+            synced = false
+            localStorage.setItem('gym_dirty', '1')
+            set({ syncStatus: e.status === 409 ? 'conflict' : 'offline' })
+            break
+          }
+        } while (localStorage.getItem('gym_dirty') === '1')
+        return synced
+      })().finally(() => { pushRun = null })
+      return pushRun
     },
     async pullState() {
       try {
-        const { state } = await api('/api/data')
+        const { state, revision } = await api('/api/data')
         const S = get().S
         const dirty = localStorage.getItem('gym_dirty') === '1'
-        if (state && (!hasData(S) || ((state._ts || 0) >= (S._ts || 0) && !dirty))) {
+        const baseRevision = localStorage.getItem(REV_KEY)
+        // Both sides changed since the last successful sync. Keep the local copy intact and make
+        // the conflict visible in state; never choose a winner using untrusted device clocks.
+        if (dirty && revision !== baseRevision) {
+          set({ syncStatus: 'conflict' })
+          return
+        }
+        if (state && !dirty) {
           const active = S.active
           const next = Object.assign(clone(DEF), state)
           if (active) next.active = active
           persist(next, false)
-        } else if (hasData(S)) { await get().pushState() }
-      } catch (e) { /* offline — keep local */ }
+          localStorage.removeItem('gym_dirty')
+        }
+        if (revision) localStorage.setItem(REV_KEY, revision)
+        else localStorage.removeItem(REV_KEY)
+        if (!state) await get().pushState()
+        set({ syncStatus: 'idle' })
+      } catch (e) { set({ syncStatus: 'offline' }) }
     },
 
     async signOut() {
-      try { await get().pushState(); await api('/api/logout', { method: 'POST', body: '{}' }) } catch (e) { /* */ }
+      const synced = await get().pushState()
+      if (!synced) throw new Error('Your changes could not be synced. Your data is still safe on this device.')
+      await api('/api/logout', { method: 'POST', body: '{}' })
       clearLocalSession()
     },
 
@@ -140,7 +193,8 @@ export const useStore = create((set, get) => {
     // the sessions elsewhere are all still valid, and wiping this device's copy of the data
     // would sign the user out of the one place the bump didn't reach. Caller reports the error.
     async signOutAll() {
-      await get().pushState()   // never throws — stores gym_dirty and moves on when offline
+      const synced = await get().pushState()
+      if (!synced) throw new Error('Your changes could not be synced. Your data is still safe on this device.')
       await api('/api/logout/all', { method: 'POST', body: '{}' })
       clearLocalSession()
     },
