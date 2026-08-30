@@ -92,7 +92,11 @@ export function status(uid) {
     return { job: null, pending: null };
   }
   return {
-    job: rec.current ? { id: rec.current.id, kind: rec.current.kind, state: rec.current.state, startedAt: rec.current.startedAt } : null,
+    job: rec.current ? {
+      id: rec.current.id, kind: rec.current.kind, state: rec.current.state,
+      phase: rec.current.phase || (rec.current.state === 'queued' ? 'queued' : 'contacting'),
+      startedAt: rec.current.startedAt, updatedAt: rec.current.updatedAt || rec.current.startedAt
+    } : null,
     pending: rec.pending || null,
     cap: capState(uid)
   };
@@ -150,7 +154,10 @@ export function enqueue(uid, opts) {
     startedAt: Date.now()
   };
   inflight.add(uid);
-  patchUser(uid, { current: { id: job.id, kind: job.kind, state: 'queued', startedAt: job.startedAt } });
+  patchUser(uid, { current: {
+    id: job.id, kind: job.kind, state: 'queued', phase: 'queued',
+    startedAt: job.startedAt, updatedAt: job.startedAt
+  } });
   queue.push(job);
   pump();
   return { id: job.id };
@@ -215,7 +222,7 @@ export function buildPrompt(kind, payload, repair) {
 /* ---------- execution ---------- */
 
 async function execute(job) {
-  patchUser(job.uid, { current: { id: job.id, kind: job.kind, state: 'running', startedAt: job.startedAt } });
+  setPhase(job, 'preparing');
 
   const S = readState(job.uid);
   if (!S) return finish(job, { outcome: 'failed', errorClass: 'nostate' });
@@ -239,13 +246,15 @@ async function execute(job) {
     const ids = (await import('./adapters/spawn.js')).unprivilegedIds();
     if (ids) fs.chownSync(jobDir, ids.uid, ids.gid);
 
-    let attempt = await invoke(adapter, cfg, payload, jobDir, env, job, null);
+    setPhase(job, 'contacting');
+    let attempt = await invoke(adapter, cfg, payload, jobDir, env, job, null, () => setPhase(job, 'validating'));
     if (!attempt.ok && attempt.repairable) {
       // One repair round, then done (FR-48). Two failures is a provider problem, not a
       // prompting problem, and a retry loop against a paid API is a bad way to find out.
+      setPhase(job, 'repairing');
       attempt = await invoke(adapter, cfg, payload, jobDir, env, job, {
         previous: attempt.raw, errors: attempt.errors
-      });
+      }, () => setPhase(job, 'validating'));
     }
     if (!attempt.ok) {
       return finish(job, { outcome: 'failed', errorClass: attempt.errorClass, detail: attempt.detail });
@@ -268,9 +277,18 @@ async function execute(job) {
   }
 }
 
-async function invoke(adapter, cfg, payload, jobDir, env, job, repair) {
+function setPhase(job, phase) {
+  const rec = readUser(job.uid);
+  if (rec.current?.id !== job.id) return;
+  patchUser(job.uid, { current: {
+    ...rec.current, state: 'running', phase, updatedAt: Date.now()
+  } });
+}
+
+async function invoke(adapter, cfg, payload, jobDir, env, job, repair, onResponse) {
   const prompt = buildPrompt(job.kind, payload, repair);
   const r = await adapter.invoke({ cfg, prompt, jobDir, env, model: cfg.model || null, timeoutMs: TIMEOUT_MS });
+  onResponse?.();
 
   if (r.timedOut) return { ok: false, errorClass: 'timeout' };
   if (r.spawnError) return { ok: false, errorClass: 'missing', detail: r.stderr?.slice(0, 300) };

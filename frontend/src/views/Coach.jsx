@@ -201,15 +201,44 @@ function ConsentCard({ onDone }) {
 /* ---------------------------------- status ---------------------------------- */
 
 function StatusCard({ job, pending, nav }) {
-  if (job) return <div className="card">
+  const [, tick] = useState(0)
+  useEffect(() => {
+    if (!job) return
+    const timer = setInterval(() => tick(n => n + 1), 1000)
+    return () => clearInterval(timer)
+  }, [job?.id])
+
+  if (job) {
+    const phases = job.phase === 'repairing'
+      ? ['preparing', 'contacting', 'validating', 'repairing']
+      : ['preparing', 'contacting', 'validating']
+    const current = Math.max(0, phases.indexOf(job.phase))
+    const elapsed = Math.max(0, Math.floor((Date.now() - (job.startedAt || Date.now())) / 1000))
+    const title = {
+      queued: 'Waiting for its turn…',
+      preparing: job.kind === 'create' ? 'Reading your answers and training data…' : 'Reading your plan and recent training…',
+      contacting: job.kind === 'create' ? 'Designing your training plan…' : 'Looking for useful adjustments…',
+      validating: 'Checking the Coach’s answer…',
+      repairing: 'Correcting an answer the app could not use…'
+    }[job.phase] || 'The Coach is thinking…'
+
+    return <div className="card">
     <div className="row" style={{ gap: 10 }}>
       <span className="lrow-i" style={{ background: 'var(--orange)' }}><Icon name="sparkles" /></span>
-      <div>
-        <div style={{ fontWeight: 600 }}>{t('The Coach is thinking…')}</div>
-        <div className="muted small">{t('This takes a minute or two. You can leave this screen — it keeps going.')}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600 }}>{t(title)}</div>
+        <div className="muted small">{t('Step {0} of {1} · {2}s elapsed', current + 1, phases.length, elapsed)}</div>
+        <div className="row" style={{ gap: 5, marginTop: 9 }} aria-label={t(title)}>
+          {phases.map((phase, i) => <span key={phase} style={{
+            height: 4, flex: 1, borderRadius: 3,
+            background: i <= current ? 'var(--acc)' : 'var(--line)'
+          }} />)}
+        </div>
+        <div className="dim" style={{ fontSize: '.72rem', marginTop: 7 }}>{t('You can leave this screen — the Coach keeps working.')}</div>
       </div>
     </div>
   </div>
+  }
 
   if (pending) return <div className="card" style={{ borderColor: 'var(--acc)' }}>
     <div className="today-row" onClick={() => nav('/coach/proposal')}>
