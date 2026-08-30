@@ -9,8 +9,27 @@
  * model-list probe to verify the credential and network path. */
 
 const BASE_URL = 'https://openrouter.ai/api/v1';
-const OUTPUT_CAP = 4 * 1024 * 1024; // same cap as the CLI adapters
 const TIMEOUT_SOFT = 4 * 60 * 1000; // hard timeout is enforced by the caller
+// Reasoning tokens count against this budget on OpenRouter. A complete plan with per-exercise
+// rationales can legitimately exceed 4k even when the visible JSON is much smaller.
+const MAX_COMPLETION_TOKENS = 16 * 1024;
+
+function errorDetail(status, raw) {
+  try {
+    const parsed = JSON.parse(raw);
+    const message = parsed?.error?.message || parsed?.error || parsed?.message;
+    if (message) return `OpenRouter API returned ${status}: ${String(message).slice(0, 400)}`;
+  } catch { /* preserve the raw provider response below */ }
+  return `OpenRouter API returned ${status}: ${String(raw || '').slice(0, 400)}`;
+}
+
+function messageText(content) {
+  if (typeof content === 'string') return content.trim();
+  if (Array.isArray(content)) {
+    return content.map(part => typeof part === 'string' ? part : part?.text || '').join('').trim();
+  }
+  return '';
+}
 
 /** Build OpenAI-compatible messages from the Coach's text prompt. */
 function toMessages(prompt) {
@@ -45,7 +64,7 @@ export default {
       });
       if (!res.ok) {
         const body = await res.text().catch(() => '');
-        return { ok: false, error: `OpenRouter API returned ${res.status}: ${body.slice(0, 200)}` };
+        return { ok: false, error: errorDetail(res.status, body) };
       }
       const body = await res.json();
       if (!body?.data?.length) return { ok: false, error: 'OpenRouter returned an empty model list' };
@@ -67,14 +86,12 @@ export default {
     const timer = setTimeout(() => controller.abort(), timeout);
 
     let text = '', stderr = '', timedOut = false;
-    const startedAt = Date.now();
-
     try {
       const body = {
         model: model || undefined,  // undefined = OpenRouter chooses the default for the account
         messages,
         temperature: 0,
-        max_tokens: 4096
+        max_completion_tokens: MAX_COMPLETION_TOKENS
       };
 
       const res = await fetch(`${BASE_URL}/chat/completions`, {
@@ -82,7 +99,7 @@ export default {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${key}`,
-          ...(model ? {} : { 'X-Title': 'openGym Coach' })
+          'X-Title': 'openGym Coach'
         },
         body: JSON.stringify(body),
         signal: controller.signal
@@ -90,7 +107,7 @@ export default {
 
       if (!res.ok) {
         const errBody = await res.text().catch(() => '');
-        stderr = `OpenRouter API returned ${res.status}: ${errBody.slice(0, 500)}`;
+        stderr = errorDetail(res.status, errBody);
         return { code: res.status, text: '', stderr, timedOut: false, spawnError: false };
       }
 
@@ -101,11 +118,17 @@ export default {
         return { code: 1, text: '', stderr, timedOut: false, spawnError: false };
       }
 
-      text = (choice.message?.content || '').trim();
+      text = messageText(choice.message?.content);
       const finish = choice.finish_reason;
       if (finish && finish !== 'stop' && finish !== 'end_turn') {
         stderr = `model stopped early: ${finish}`;
-        // Return the partial text so the validator can still try to extract JSON.
+        // A truncated object cannot pass validation. Reporting a provider failure here avoids
+        // spending a second paid request trying to repair output under the same hard limit.
+        return { code: 1, text, stderr, timedOut: false, spawnError: false };
+      }
+      if (!text) {
+        stderr = 'OpenRouter returned an empty assistant message';
+        return { code: 1, text: '', stderr, timedOut: false, spawnError: false };
       }
 
       return { code: 0, text, stderr, timedOut: false, spawnError: false };
