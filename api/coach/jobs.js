@@ -281,18 +281,32 @@ async function invoke(adapter, cfg, payload, jobDir, env, job, repair) {
   }
 
   const parsed = extractJSON(r.text);
-  if (parsed.error) return { ok: false, repairable: !repair, errors: [parsed.error], raw: r.text, errorClass: 'unusable' };
+  if (parsed.error) return unusable([parsed.error], r.text, repair);
   if (!contractOK(parsed.value)) {
-    return { ok: false, repairable: !repair, errors: [`coach_contract must be ${payloadLib.CONTRACT}`], raw: r.text, errorClass: 'unusable' };
+    return unusable([`coach_contract must be ${payloadLib.CONTRACT}`], r.text, repair);
   }
 
   const v = job.kind === 'review'
     ? validateReview(parsed.value, payload.plan)
     : validatePlan(parsed.value, { workingWeights: payload.history?.workingWeights, daysPerWeek: payload.coachProfile?.daysPerWeek });
 
-  if (!v.ok) return { ok: false, repairable: !repair, errors: v.errors, raw: r.text, errorClass: 'unusable' };
+  if (!v.ok) return unusable(v.errors, r.text, repair);
   if (v.nochange) return { ok: true, nochange: true, reading: v.reading };
   return { ok: true, result: v.proposal ? v.proposal : { bundle: v.bundle, summary: v.bundle.summary } };
+}
+
+function unusable(errors, raw, repair) {
+  const list = (errors || []).map(String);
+  return {
+    ok: false,
+    repairable: !repair,
+    errors: list,
+    raw,
+    errorClass: 'unusable',
+    // The admin log already stores provider errors. Keep validation diagnostics equally
+    // useful while bounding them so no full model answer or user payload is persisted.
+    detail: list.join('; ').slice(0, 300)
+  };
 }
 
 /**

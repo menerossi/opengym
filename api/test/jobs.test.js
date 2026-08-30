@@ -94,6 +94,7 @@ test('an answer that stays unusable fails cleanly and applies nothing', async ()
   const last = lastOutcome(uid);
   assert.equal(last.outcome, 'failed');
   assert.equal(last.errorClass, 'unusable');
+  assert.match(cfg.lastError().detail, /answer was not JSON/);
   assert.equal(s.pending, null, 'nothing partial is ever left behind');
 });
 
@@ -172,4 +173,3 @@ test('the plan fingerprint moves when the plan does, and only then', async () =>
   assert.equal(jobs.hashPlan(plan), jobs.hashPlan(same));
   assert.notEqual(jobs.hashPlan(plan), jobs.hashPlan(moved));
 });
-

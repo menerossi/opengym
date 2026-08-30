@@ -32,12 +32,29 @@ test('OpenRouter sends a sufficient completion budget and separates rules from p
   assert.equal(request.body.model, 'openai/test-model');
   assert.equal(request.body.max_completion_tokens, 16384);
   assert.equal(Object.hasOwn(request.body, 'max_tokens'), false);
+  assert.deepEqual(request.body.response_format, { type: 'json_object' });
   assert.deepEqual(request.body.reasoning, { effort: 'minimal', exclude: true });
   assert.equal(request.body.messages[0].role, 'system');
   assert.equal(request.body.messages[0].content, 'System rules');
   assert.equal(request.body.messages[1].role, 'user');
   assert.equal(request.body.messages[1].content, '{"hello":"world"}');
   assert.equal(request.init.headers['X-Title'], 'openGym Coach');
+});
+
+test('OpenRouter falls back when an upstream model does not support JSON mode', async () => {
+  const requests = [];
+  globalThis.fetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    requests.push(body);
+    if (requests.length === 1) return reply({ error: { message: 'response_format is not supported by this model' } }, 400);
+    return reply({ choices: [{ message: { content: '{"coach_contract":1,"ok":true}' }, finish_reason: 'stop' }] });
+  };
+
+  const result = await invoke();
+  assert.equal(result.code, 0);
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests[0].response_format, { type: 'json_object' });
+  assert.equal(Object.hasOwn(requests[1], 'response_format'), false);
 });
 
 test('OpenRouter accepts text-part arrays returned by compatible providers', async () => {

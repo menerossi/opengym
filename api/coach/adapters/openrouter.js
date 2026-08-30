@@ -14,6 +14,29 @@ const TIMEOUT_SOFT = 4 * 60 * 1000; // hard timeout is enforced by the caller
 // rationales can legitimately exceed 4k even when the visible JSON is much smaller.
 const MAX_COMPLETION_TOKENS = 16 * 1024;
 
+function requestBody(model, messages, structured = true) {
+  return {
+    model: model || undefined,  // undefined = OpenRouter uses the account's configured default
+    messages,
+    temperature: 0,
+    max_completion_tokens: MAX_COMPLETION_TOKENS,
+    // JSON mode materially reduces fenced, conversational and partially-structured answers.
+    // It is intentionally the portable json_object mode rather than a provider-specific JSON
+    // schema: OpenRouter can route one configured model through several upstream providers.
+    ...(structured ? { response_format: { type: 'json_object' } } : {}),
+    // Some OpenRouter models default to spending most of the completion budget on hidden
+    // reasoning (up to ~95% at max effort). The Coach needs a complete JSON document more
+    // than a long chain of thought, so leave the model a predictable majority for output.
+    reasoning: { effort: 'minimal', exclude: true }
+  };
+}
+
+function responseFormatUnsupported(status, raw) {
+  if (![400, 404, 422].includes(status)) return false;
+  return /response[_ -]?format|json[_ -]?(?:object|mode)|structured output/i.test(String(raw || '')) &&
+    /unsupported|not support|invalid|unknown|unrecognized|not available/i.test(String(raw || ''));
+}
+
 function errorDetail(status, raw) {
   try {
     const parsed = JSON.parse(raw);
@@ -87,33 +110,35 @@ export default {
 
     let text = '', stderr = '', timedOut = false;
     try {
-      const body = {
-        model: model || undefined,  // undefined = OpenRouter chooses the default for the account
-        messages,
-        temperature: 0,
-        max_completion_tokens: MAX_COMPLETION_TOKENS,
-        // Some OpenRouter models default to spending most of the completion budget on hidden
-        // reasoning (up to ~95% at max effort). The Coach needs a complete JSON document more
-        // than a long chain of thought, so leave the model a predictable majority for output.
-        // OpenRouter maps unsupported effort levels to the closest one a model accepts.
-        reasoning: { effort: 'minimal', exclude: true }
-      };
-
-      const res = await fetch(`${BASE_URL}/chat/completions`, {
+      const send = structured => fetch(`${BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${key}`,
           'X-Title': 'openGym Coach'
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(requestBody(model, messages, structured)),
         signal: controller.signal
       });
 
+      let res = await send(true);
+
       if (!res.ok) {
-        const errBody = await res.text().catch(() => '');
-        stderr = errorDetail(res.status, errBody);
-        return { code: res.status, text: '', stderr, timedOut: false, spawnError: false };
+        let errBody = await res.text().catch(() => '');
+        // A few upstream models do not implement JSON mode. The first request failed before
+        // generation, so retrying once without that optional capability does not duplicate a
+        // paid completion and retains the prompt-only behaviour older installations had.
+        if (responseFormatUnsupported(res.status, errBody)) {
+          res = await send(false);
+          if (res.ok) errBody = '';
+          else errBody = await res.text().catch(() => '');
+        }
+        if (res.ok) {
+          // Continue through the normal response parsing below.
+        } else {
+          stderr = errorDetail(res.status, errBody);
+          return { code: res.status, text: '', stderr, timedOut: false, spawnError: false };
+        }
       }
 
       const data = await res.json();
