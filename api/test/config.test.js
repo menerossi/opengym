@@ -66,7 +66,7 @@ test('retired Gemini and Custom command configurations reset to unconfigured Cla
   });
   cfg.reset();
   const current = cfg.load();
-  assert.deepEqual(Object.keys(cfg.PROVIDERS).sort(), ['claude', 'codex', 'fixture']);
+  assert.deepEqual(Object.keys(cfg.PROVIDERS).sort(), ['claude', 'codex', 'fixture', 'openrouter']);
   assert.equal(current.provider, 'claude');
   assert.equal(current.auth, null);
   assert.equal(Object.hasOwn(current, 'customCommand'), false);
