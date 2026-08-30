@@ -1,5 +1,14 @@
 // Spanish UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Sync needs attention': 'La sincronización necesita atención',
+  'This device and the server both changed. Export a backup before choosing if you may need both copies.': 'Este dispositivo y el servidor han cambiado. Exporta una copia de seguridad antes de elegir si puedes necesitar ambas copias.',
+  'Keep this device': 'Conservar este dispositivo',
+  'Use server copy': 'Usar copia del servidor',
+  'Keep this device?': '¿Conservar este dispositivo?',
+  'Use server copy?': '¿Usar la copia del servidor?',
+  'Export a backup first if you may need both versions. This choice cannot be merged later.': 'Exporta primero una copia de seguridad si puedes necesitar ambas versiones. Esta elección no podrá combinarse después.',
+  'Sync conflict resolved': 'Conflicto de sincronización resuelto',
+  'Could not resolve sync conflict': 'No se pudo resolver el conflicto de sincronización',
   'Confirm': 'Confirmar',
   'Cancel': 'Cancelar',
   'Delete': 'Eliminar',

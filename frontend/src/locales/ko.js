@@ -1,5 +1,14 @@
 // Korean UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Sync needs attention': '동기화에 확인이 필요합니다',
+  'This device and the server both changed. Export a backup before choosing if you may need both copies.': '이 기기와 서버의 데이터가 모두 변경되었습니다. 두 사본이 모두 필요할 수 있다면 선택 전에 백업을 내보내세요.',
+  'Keep this device': '이 기기 데이터 유지',
+  'Use server copy': '서버 사본 사용',
+  'Keep this device?': '이 기기 데이터를 유지할까요?',
+  'Use server copy?': '서버 사본을 사용할까요?',
+  'Export a backup first if you may need both versions. This choice cannot be merged later.': '두 버전이 모두 필요할 수 있다면 먼저 백업을 내보내세요. 나중에 병합할 수 없습니다.',
+  'Sync conflict resolved': '동기화 충돌이 해결되었습니다',
+  'Could not resolve sync conflict': '동기화 충돌을 해결하지 못했습니다',
   'Confirm': '확인',
   'Cancel': '취소',
   'Delete': '삭제',

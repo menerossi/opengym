@@ -1,5 +1,14 @@
 // Simplified Chinese UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Sync needs attention': '同步需要处理',
+  'This device and the server both changed. Export a backup before choosing if you may need both copies.': '此设备和服务器上的数据都已更改。如果可能需要两个副本，请在选择前导出备份。',
+  'Keep this device': '保留此设备的数据',
+  'Use server copy': '使用服务器副本',
+  'Keep this device?': '保留此设备的数据？',
+  'Use server copy?': '使用服务器副本？',
+  'Export a backup first if you may need both versions. This choice cannot be merged later.': '如果可能需要两个版本，请先导出备份。之后无法合并此选择。',
+  'Sync conflict resolved': '同步冲突已解决',
+  'Could not resolve sync conflict': '无法解决同步冲突',
   'Confirm': '确认',
   'Cancel': '取消',
   'Delete': '删除',

@@ -179,6 +179,35 @@ export const useStore = create((set, get) => {
         set({ syncStatus: 'idle' })
       } catch (e) { set({ syncStatus: 'offline' }) }
     },
+    async resolveSyncConflict(choice) {
+      if (choice !== 'local' && choice !== 'remote') throw new Error('invalid sync choice')
+      set({ syncStatus: 'syncing' })
+      try {
+        const { state, revision } = await api('/api/data')
+        if (choice === 'remote') {
+          const active = get().S.active
+          const next = Object.assign(clone(DEF), state || {})
+          if (active) next.active = active
+          persist(next, false)
+          if (revision) localStorage.setItem(REV_KEY, revision)
+          else localStorage.removeItem(REV_KEY)
+          localStorage.removeItem('gym_dirty')
+          set({ syncStatus: 'idle' })
+          return true
+        }
+
+        // "Keep this device" is an intentional overwrite, but still uses CAS: if the server
+        // changes again between this GET and PUT, it remains a conflict instead of erasing data.
+        if (revision) localStorage.setItem(REV_KEY, revision)
+        else localStorage.removeItem(REV_KEY)
+        localStorage.setItem('gym_dirty', '1')
+        return await get().pushState()
+      } catch (e) {
+        localStorage.setItem('gym_dirty', '1')
+        set({ syncStatus: e.status === 409 ? 'conflict' : 'offline' })
+        return false
+      }
+    },
 
     async signOut() {
       const synced = await get().pushState()

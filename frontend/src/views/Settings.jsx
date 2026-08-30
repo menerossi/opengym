@@ -28,6 +28,8 @@ export default function Settings() {
   const pushState = useStore(s => s.pushState)
   const signOut = useStore(s => s.signOut)
   const signOutAll = useStore(s => s.signOutAll)
+  const syncStatus = useStore(s => s.syncStatus)
+  const resolveSyncConflict = useStore(s => s.resolveSyncConflict)
   const resetDemo = useStore(s => s.resetDemo)
   const toast = useUI(s => s.toast)
   const fileRef = useRef(null)
@@ -75,6 +77,16 @@ export default function Settings() {
       catch (e) { toast(t('Could not sign out everywhere — you are still signed in.')) }
     },
   })
+  const resolveConflict = choice => confirmSheet({
+    title: t(choice === 'local' ? 'Keep this device?' : 'Use server copy?'),
+    message: t('Export a backup first if you may need both versions. This choice cannot be merged later.'),
+    confirmText: t(choice === 'local' ? 'Keep this device' : 'Use server copy'),
+    danger: true,
+    onConfirm: async () => {
+      const ok = await resolveSyncConflict(choice)
+      toast(ok ? t('Sync conflict resolved') : t('Could not resolve sync conflict'))
+    },
+  })
 
   return <div className="narrow">
     <div className="hdr">
@@ -107,6 +119,13 @@ export default function Settings() {
       )}
     </Section>
     {!user && !DEMO && !MOBILE && <p className="sect-f" style={{ marginTop: -18, marginBottom: 22 }}>{t('Guest mode — data lives only in this browser.')}</p>}
+
+    {user && syncStatus === 'conflict' && <Section title={t('Sync needs attention')}
+      footer={t('This device and the server both changed. Export a backup before choosing if you may need both copies.')}>
+      <Row icon="download" iconTint="var(--blue)" title={t('Export backup (JSON)')} accessory="chevron" onClick={doExport} />
+      <Row icon="upload" iconTint="var(--orange)" title={t('Keep this device')} accessory="chevron" onClick={() => resolveConflict('local')} />
+      <Row icon="download" iconTint="var(--red)" title={t('Use server copy')} danger accessory="chevron" onClick={() => resolveConflict('remote')} />
+    </Section>}
 
     {/* ---------- general ---------- */}
     <Section title={t('General')} footer={t('Note: switching units only changes the label — logged numbers are not converted.')}>

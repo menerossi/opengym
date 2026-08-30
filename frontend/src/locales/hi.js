@@ -1,5 +1,14 @@
 // Hindi UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Sync needs attention': 'सिंक पर ध्यान देने की ज़रूरत है',
+  'This device and the server both changed. Export a backup before choosing if you may need both copies.': 'इस डिवाइस और सर्वर दोनों में बदलाव हुए हैं। यदि दोनों प्रतियाँ चाहिए हो सकती हैं, तो चुनने से पहले बैकअप निर्यात करें।',
+  'Keep this device': 'इस डिवाइस की प्रति रखें',
+  'Use server copy': 'सर्वर की प्रति उपयोग करें',
+  'Keep this device?': 'इस डिवाइस की प्रति रखें?',
+  'Use server copy?': 'सर्वर की प्रति उपयोग करें?',
+  'Export a backup first if you may need both versions. This choice cannot be merged later.': 'यदि दोनों संस्करण चाहिए हो सकते हैं तो पहले बैकअप निर्यात करें। इस चुनाव को बाद में मिलाया नहीं जा सकता।',
+  'Sync conflict resolved': 'सिंक टकराव हल हो गया',
+  'Could not resolve sync conflict': 'सिंक टकराव हल नहीं हो सका',
   'Confirm': 'पुष्टि करें',
   'Cancel': 'रद्द करें',
   'Delete': 'हटाएँ',

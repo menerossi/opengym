@@ -1,5 +1,14 @@
 // Russian UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Sync needs attention': 'Синхронизация требует внимания',
+  'This device and the server both changed. Export a backup before choosing if you may need both copies.': 'Данные на этом устройстве и сервере изменились. Перед выбором экспортируйте резервную копию, если могут понадобиться обе версии.',
+  'Keep this device': 'Оставить данные устройства',
+  'Use server copy': 'Использовать копию сервера',
+  'Keep this device?': 'Оставить данные устройства?',
+  'Use server copy?': 'Использовать копию сервера?',
+  'Export a backup first if you may need both versions. This choice cannot be merged later.': 'Сначала экспортируйте резервную копию, если могут понадобиться обе версии. Позже объединить их будет нельзя.',
+  'Sync conflict resolved': 'Конфликт синхронизации разрешён',
+  'Could not resolve sync conflict': 'Не удалось разрешить конфликт синхронизации',
   'Confirm': 'Подтвердить',
   'Cancel': 'Отмена',
   'Delete': 'Удалить',

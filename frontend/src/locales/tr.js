@@ -1,5 +1,14 @@
 // Turkish UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Sync needs attention': 'Eşitleme ilgilenmenizi gerektiriyor',
+  'This device and the server both changed. Export a backup before choosing if you may need both copies.': 'Hem bu cihazdaki hem sunucudaki veriler değişti. İki kopyaya da ihtiyacınız olabilirse seçimden önce yedek dışa aktarın.',
+  'Keep this device': 'Bu cihazdaki veriyi koru',
+  'Use server copy': 'Sunucu kopyasını kullan',
+  'Keep this device?': 'Bu cihazdaki veri korunsun mu?',
+  'Use server copy?': 'Sunucu kopyası kullanılsın mı?',
+  'Export a backup first if you may need both versions. This choice cannot be merged later.': 'İki sürüme de ihtiyacınız olabilirse önce yedek dışa aktarın. Bu seçim daha sonra birleştirilemez.',
+  'Sync conflict resolved': 'Eşitleme çakışması çözüldü',
+  'Could not resolve sync conflict': 'Eşitleme çakışması çözülemedi',
   'Confirm': 'Onayla',
   'Cancel': 'İptal',
   'Delete': 'Sil',
