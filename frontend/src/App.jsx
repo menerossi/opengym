@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
@@ -7,7 +7,6 @@ import { ACCENTS } from './lib/format.js'
 import { setLang, useLang } from './lib/i18n.js'
 import { setNav } from './lib/nav.js'
 import { useWakeLock } from './lib/wakelock.js'
-import { startFlow } from './sheets.jsx'
 import Icon from './components/Icon.jsx'
 import TabBar from './components/TabBar.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
@@ -15,18 +14,19 @@ import Modals from './components/Modals.jsx'
 import Toast from './components/Toast.jsx'
 import RestTimer from './components/RestTimer.jsx'
 import Login from './views/Login.jsx'
-import Home from './views/Home.jsx'
-import Plan from './views/Plan.jsx'
-import RoutineEdit from './views/RoutineEdit.jsx'
-import Workout from './views/Workout.jsx'
-import Stats from './views/Stats.jsx'
-import History from './views/History.jsx'
-import Library from './views/Library.jsx'
-import Settings from './views/Settings.jsx'
-import Admin from './views/Admin.jsx'
-import Coach from './views/Coach.jsx'
-import CoachIntake from './views/CoachIntake.jsx'
-import CoachProposal from './views/CoachProposal.jsx'
+
+const Home = lazy(() => import('./views/Home.jsx'))
+const Plan = lazy(() => import('./views/Plan.jsx'))
+const RoutineEdit = lazy(() => import('./views/RoutineEdit.jsx'))
+const Workout = lazy(() => import('./views/Workout.jsx'))
+const Stats = lazy(() => import('./views/Stats.jsx'))
+const History = lazy(() => import('./views/History.jsx'))
+const Library = lazy(() => import('./views/Library.jsx'))
+const Settings = lazy(() => import('./views/Settings.jsx'))
+const Admin = lazy(() => import('./views/Admin.jsx'))
+const Coach = lazy(() => import('./views/Coach.jsx'))
+const CoachIntake = lazy(() => import('./views/CoachIntake.jsx'))
+const CoachProposal = lazy(() => import('./views/CoachProposal.jsx'))
 
 bindUI(useUI)   // lets the shared controls open sheets without importing the store at module scope
 
@@ -41,17 +41,23 @@ function applyPrefs(theme, accent) {
 function Shell() {
   const navigate = useNavigate()
   const loc = useLocation()
-  const { S, user, ready } = useStore()
+  const theme = useStore(s => s.S.theme)
+  const accent = useStore(s => s.S.accent)
+  const lang = useStore(s => s.S.lang)
+  const active = useStore(s => s.S.active)
+  const keepAwake = useStore(s => s.S.keepAwake)
+  const user = useStore(s => s.user)
+  const ready = useStore(s => s.ready)
   const isGuest = useStore(s => s.isGuest())
   const langV = useLang()   // re-renders the whole shell when the language (pack) changes
   useEffect(() => { setNav(navigate) }, [navigate])
-  useEffect(() => { applyPrefs(S.theme, S.accent) }, [S.theme, S.accent])
-  useEffect(() => { setLang(S.lang || 'en') }, [S.lang])
-  useEffect(() => { document.documentElement.lang = S.lang || 'en' }, [langV, S.lang])
+  useEffect(() => { applyPrefs(theme, accent) }, [theme, accent])
+  useEffect(() => { setLang(lang || 'en') }, [lang])
+  useEffect(() => { document.documentElement.lang = lang || 'en' }, [langV, lang])
   // every tab/route change starts at the top of the page
   useEffect(() => { window.scrollTo(0, 0) }, [loc.pathname])
   // bound to the workout, not to the route — checking Stats mid-session keeps the screen on
-  useWakeLock(!!S.active && S.keepAwake !== false)
+  useWakeLock(!!active && keepAwake !== false)
 
   const authed = user || isGuest
   if (!ready && !authed) return (
@@ -66,10 +72,10 @@ function Shell() {
     <>
       {/* keyed on the route: a view that throws is contained, and switching tabs
           re-mounts the boundary, so the tab bar is always a way out */}
-      <div id="app" className="vfade" key={loc.pathname}>
+      <div id="app" className="vfade">
         <ErrorBoundary>
           {!authed ? <Login /> : (
-            <Routes>
+            <Suspense fallback={<div className="route-loading" aria-label="Loading" />}><Routes>
               <Route path="/home" element={<Home />} />
               <Route path="/plan" element={<Plan />} />
               <Route path="/plan/r/:id" element={<RoutineEdit />} />
@@ -86,11 +92,11 @@ function Shell() {
               <Route path="/coach/proposal" element={<CoachProposal />} />
               <Route path="/admin" element={user?.admin ? <Admin /> : <Navigate to="/home" replace />} />
               <Route path="*" element={<Navigate to="/home" replace />} />
-            </Routes>
+            </Routes></Suspense>
           )}
         </ErrorBoundary>
       </div>
-      <TabBar onStart={startFlow} />
+      <TabBar />
       <RestTimer />
       <Modals />
       <Toast />

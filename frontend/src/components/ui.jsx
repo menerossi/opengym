@@ -23,11 +23,11 @@ import Icon from './Icon.jsx'
 // 0). Keeps a local string draft while focused so partial input like "33," survives.
 // `nullable` is for fields where "nothing entered" and 0 mean different things (RIR: a
 // logged 0 is a set taken to failure). Those clear back to null instead of snapping to 0.
-export function NumberField({ value, onChange, decimal = true, nullable = false, className = '', ...rest }) {
+export function NumberField({ value, onChange, decimal = true, nullable = false, defer = false, className = '', ...rest }) {
   const [draft, setDraft] = useState(null)
   const committed = useRef(null)
   // null and undefined are the same "empty" here — a nullable field's key is dropped once cleared.
-  if (draft !== null && (committed.current ?? null) !== (value ?? null)) { setDraft(null); committed.current = null }
+  if (!defer && draft !== null && (committed.current ?? null) !== (value ?? null)) { setDraft(null); committed.current = null }
   const commit = raw => {
     let s = raw.replace(/,/g, '.').replace(/[^0-9.]/g, '')
     const i = s.indexOf('.')
@@ -35,7 +35,7 @@ export function NumberField({ value, onChange, decimal = true, nullable = false,
     const n = s === '' || s === '.' ? (nullable ? null : 0) : Math.max(0, parseFloat(s))
     committed.current = n
     setDraft(s)
-    onChange(n)
+    if (!defer) onChange(n)
   }
   return (
     <input
@@ -45,7 +45,10 @@ export function NumberField({ value, onChange, decimal = true, nullable = false,
       value={draft ?? (value ?? '')}
       onFocus={e => e.target.select()}
       onChange={e => commit(e.target.value)}
-      onBlur={() => { setDraft(null); committed.current = null }}
+      onBlur={() => {
+        if (defer && draft !== null) onChange(committed.current)
+        setDraft(null); committed.current = null
+      }}
       {...rest}
     />
   )

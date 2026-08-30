@@ -93,7 +93,7 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
     <div className={'stp ' + cls}>
       <button aria-label="Decrease" onClick={() => bump(s, i, col, -1)}><Icon name="minus" /></button>
       {/* a typed effort is capped — there is no RPE 12, and 12 reps in reserve is a warm-up */}
-      <span className="val"><NumberField decimal={col.dec} nullable={col.opt} value={s[col.f] ?? ''}
+      <span className="val"><NumberField defer decimal={col.dec} nullable={col.opt} value={s[col.f] ?? ''}
         onChange={v => onField(i, col.f, col.eff ? capEffort(col.eff, v) : v)} /></span>
       <button aria-label="Increase" onClick={() => bump(s, i, col, 1)}><Icon name="plus" /></button>
     </div>

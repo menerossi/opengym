@@ -9,7 +9,9 @@ import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 
 function RegisterSheet({ close }) {
-  const { setUser, pushState, pullState } = useStore()
+  const setUser = useStore(s => s.setUser)
+  const pushState = useStore(s => s.pushState)
+  const pullState = useStore(s => s.pullState)
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [inviteOnly, setInviteOnly] = useState(false)
@@ -43,7 +45,9 @@ function RegisterSheet({ close }) {
 }
 
 export default function Login() {
-  const { setUser, pullState, setGuest } = useStore()
+  const setUser = useStore(s => s.setUser)
+  const pullState = useStore(s => s.pullState)
+  const setGuest = useStore(s => s.setGuest)
   const signIn = async () => {
     try { const u = await passkeyLogin(); setUser(u); await pullState(); useUI.getState().toast(t('Welcome back, {0}', u.name)) }
     catch (e) { if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') useUI.getState().toast(e.message || t('Sign-in failed')) }

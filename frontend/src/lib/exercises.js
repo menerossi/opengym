@@ -1,8 +1,8 @@
 import { EXDB } from './exercises-data.js'
+import { EXIDX, registerCustom } from './exercise-registry.js'
 import { t } from './i18n.js'
 
-export { EXDB }
-export const EXIDX = {}
+export { EXDB, EXIDX, registerCustom }
 EXDB.forEach(e => { EXIDX[e.id] = e })
 export const BODYPARTS = [...new Set(EXDB.map(e => e.bp))].sort()
 
@@ -15,14 +15,6 @@ export function equipmentOf(list) {
   return Object.keys(c).sort((a, b) => c[b] - c[a] || (a < b ? -1 : 1))
 }
 
-// Custom (user-created) exercises live in synced state S.customEx (issue #11) and are
-// merged into the id index here so every EXIDX[id] lookup keeps working unchanged.
-let customIds = []
-export function registerCustom(list) {
-  customIds.forEach(id => delete EXIDX[id])
-  customIds = (list || []).map(e => e.id)
-  ;(list || []).forEach(e => { EXIDX[e.id] = e })
-}
 // Full searchable catalogue — customs first so your own exercises are easy to find.
 export const allExercises = st => [...(st.customEx || []), ...EXDB]
 

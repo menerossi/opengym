@@ -1,24 +1,34 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
-import { effectiveRoutine } from '../lib/history.js'
 import { todayISO } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
 import Icon from './Icon.jsx'
 
-export default function TabBar({ onStart }) {
+export default function TabBar() {
   const nav = useNavigate()
   const loc = useLocation()
-  const S = useStore(s => s.S)
+  const active = useStore(s => s.S.active)
+  const week = useStore(s => s.S.week)
+  const dayPlan = useStore(s => s.S.dayPlan)
+  const routines = useStore(s => s.S.routines)
   const user = useStore(s => s.user)
   const isGuest = useStore(s => s.isGuest())
   if (!user && !isGuest) return null
   const cur = loc.pathname.split('/')[1] || 'home'
   const on = k => cur === k || (cur === 'history' && k === 'stats') || (cur === 'settings' && k === 'home')
 
-  const startWorkout = () => {
-    if (!S.active) {
-      const r = effectiveRoutine(S, todayISO())
-      if (r && r.ex.length) { onStart(r.id); return }
+  const startWorkout = async () => {
+    if (!active) {
+      const iso = todayISO()
+      const override = dayPlan[iso]
+      const day = new Date(iso + 'T12:00:00').getDay()
+      const routineId = override === 'rest' ? null : override || week[day]
+      const r = routineId ? routines.find(x => x.id === routineId) : null
+      if (r && r.ex.length) {
+        const { startFlow } = await import('../sheets.jsx')
+        startFlow(r.id)
+        return
+      }
     }
     nav('/workout')
   }
@@ -32,9 +42,9 @@ export default function TabBar({ onStart }) {
     <nav id="tabbar">
       <Tab k="home" icon="house" to="/home" label={t('Home')} />
       <Tab k="plan" icon="calendar" to="/plan" label={t('Plan')} />
-      <button className={'start' + (S.active ? ' rec' : '')} onClick={startWorkout}>
-        <span className="cir"><Icon name={S.active ? 'play' : 'dumbbell'} /></span>
-        <span>{S.active ? t('Resume') : t('Start')}</span>
+      <button className={'start' + (active ? ' rec' : '')} onClick={startWorkout}>
+        <span className="cir"><Icon name={active ? 'play' : 'dumbbell'} /></span>
+        <span>{active ? t('Resume') : t('Start')}</span>
       </button>
       <Tab k="stats" icon="chart" to="/stats" label={t('Stats')} />
       <Tab k="library" icon="list" to="/library" label={t('Exercises')} />

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { api } from '../lib/api.js'
 import { localTZ } from '../lib/format.js'
-import { registerCustom } from '../lib/exercises.js'
+import { registerCustom } from '../lib/exercise-registry.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
 import { MOBILE, nativeLoad, nativeSave, syncReminder } from '../lib/mobile.js'
 
