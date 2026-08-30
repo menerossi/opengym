@@ -601,6 +601,19 @@ h4.sec{
 .cfgrow .stp button{width:30px}
 .cfgrow .stp-l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
+/* Progression labels are substantially longer in several locales. Give the selected rule
+   its own line instead of making it compete horizontally with "Rule", and let the increment
+   label wrap rather than drawing over the numeric control on narrow phones. */
+.progression-rule .lrow{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;row-gap:2px;
+}
+.progression-rule .lrow-m{grid-column:1;grid-row:1}
+.progression-rule .lrow-v{
+  grid-column:1;grid-row:2;max-width:none;text-align:left;font-size:15px;
+}
+.progression-rule .lrow-c{grid-column:2;grid-row:1 / span 2;align-self:center}
+.progression-step .stp-l{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25}
+
 /* --- rest timer --- */
 #timer{
   position:fixed;left:12px;right:12px;bottom:calc(88px + var(--sab));z-index:60;

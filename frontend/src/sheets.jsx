@@ -467,13 +467,13 @@ function ProgressionFields({ ex, mode, c, setC, routine, unit }) {
   const inc = c.inc > 0 ? c.inc : (mode === 'time' ? 5 : defaultIncrement(ex.id, unit))
   return <>
     <h4 className="sec">{t('Progression')}</h4>
-    <div className="sect-b" style={{ marginBottom: 8 }}>
+    <div className="sect-b progression-rule" style={{ marginBottom: 8 }}>
       <SelectRow title={t('Rule')} sheetTitle={t('Progression')} value={c.prog || ''} onChange={v => setC(x => ({ ...x, prog: v || undefined }))}
         options={[{ value: '', label: t('Follow the routine ({0})', t(POLICY_NAME[inherited])) },
           ...options.map(p => ({ value: p, label: t(POLICY_NAME[p]) }))]} />
     </div>
     <div className="small dim" style={{ marginBottom: active === 'off' ? 18 : 10 }}>{t(POLICY_DESC[active])}</div>
-    {active !== 'off' && <div className="row cfgrow" style={{ marginBottom: 18 }}>
+    {active !== 'off' && <div className="row cfgrow progression-step" style={{ marginBottom: 18 }}>
       <Stepper label={mode === 'time' ? t('Step (seconds)') : t('Step ({0})', unit)} value={inc}
         step={mode === 'time' ? 5 : 1.25} decimal={mode !== 'time'} onChange={v => setC(x => ({ ...x, inc: v }))} />
       {active === 'double' && <Stepper label={t('Reps from')} value={c.repsMin || Math.max(1, (c.reps || 10) - 2)}
