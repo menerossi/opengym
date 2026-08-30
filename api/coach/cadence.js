@@ -50,6 +50,7 @@ export function startCadence(deps) {
         const S = jobs.readState(user.id);
         const coach = S?.coach;
         if (!coach?.consent?.agreedAt) continue;         // consent revoked ⇒ cadence stops
+        if (jobs.hasOutstanding(user.id) || jobs.scheduledCovered(user.id, S)) continue;
         const tz = coach.cadence?.weekly ? (S.reminder?.tz || 'UTC') : null;
         const now = tz ? deps.userNow(tz) : null;
         if (!isDue(coach, S, now)) continue;

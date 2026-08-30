@@ -37,7 +37,7 @@ export const disclosure = async () => DEMO ? (await demo()).demoDisclosure() : a
  * failing while you are mid-workout is not something to interrupt anyone about.
  */
 export function useCoachStatus(active = true) {
-  const [state, setState] = useState({ job: null, pending: null, cap: null, loading: true })
+  const [state, setState] = useState({ job: null, pending: null, result: null, cap: null, loading: true })
   const timer = useRef(null)
 
   const refresh = useCallback(async () => {

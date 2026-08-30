@@ -54,7 +54,7 @@ function CreatedPlan({ p, S, update, toast, nav, refresh }) {
   const accept = () => {
     try {
       update(s => { applyCreatedPlan(s, p, { schedule }) })
-      resolvePending({ accepted: ['plan'] }).catch(() => {})
+      resolvePending({ proposalId: p.id, accepted: ['plan'] }).catch(() => {})
       toast(t('Your plan is live'))
       nav('/plan')
     } catch (e) { toast(e.message || t('That proposal can’t be read.')) }
@@ -64,7 +64,7 @@ function CreatedPlan({ p, S, update, toast, nav, refresh }) {
     confirmText: t('Discard'), danger: true,
     onConfirm: () => {
       update(s => { recordDismissal(s, p) })
-      resolvePending({ dismissed: true }).catch(() => {})
+      resolvePending({ proposalId: p.id, dismissed: true }).catch(() => {})
       nav('/coach')
     }
   })
@@ -142,7 +142,7 @@ function ChangeSet({ p, S, update, toast, nav }) {
     if (!ids.length) { discard(); return }
     try {
       update(s => { applyChangeSet(s, marked, ids) })
-      resolvePending({ accepted: ids, rejected: marked.changes.filter(c => !ids.includes(c.id)).map(c => c.id) }).catch(() => {})
+      resolvePending({ proposalId: p.id, accepted: ids, rejected: marked.changes.filter(c => !ids.includes(c.id)).map(c => c.id) }).catch(() => {})
       toast(t(ids.length === 1 ? '{0} change applied' : '{0} changes applied', ids.length))
       nav('/plan')
     } catch (e) { toast(e.message || t('Could not apply those changes')) }
@@ -152,7 +152,7 @@ function ChangeSet({ p, S, update, toast, nav }) {
     confirmText: t('Dismiss'), danger: true,
     onConfirm: () => {
       update(s => { recordDismissal(s, marked) })
-      resolvePending({ dismissed: true }).catch(() => {})
+      resolvePending({ proposalId: p.id, dismissed: true }).catch(() => {})
       nav('/coach')
     }
   })

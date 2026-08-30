@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { tempData } from './helpers.mjs';
 
 tempData();
-const { extractJSON, validatePlan, validateReview, CHANGE_TYPES } = await import('../coach/validate.js');
+const { extractJSON, validatePlan, validateReview, contractOK, CHANGE_TYPES } = await import('../coach/validate.js');
 
 const PLAN = {
   routines: [{
@@ -26,6 +26,12 @@ test('JSON is recovered from whatever the model wrapped it in', () => {
   assert.ok(extractJSON('').error);
 });
 
+test('the provider response must declare the exact contract version', () => {
+  assert.equal(contractOK({ coach_contract: 1 }), true);
+  assert.equal(contractOK({}), false);
+  assert.equal(contractOK({ coach_contract: 2 }), false);
+});
+
 /* ---------------- created plans ---------------- */
 
 test('a plan referencing an unknown exercise is rejected, not quietly trimmed', () => {
@@ -43,6 +49,20 @@ test('a plan may reference a custom exercise it defines in the same answer', () 
   });
   assert.equal(r.ok, true);
   assert.equal(r.bundle.customEx[0].n, 'Sandbag carry');
+});
+
+test('proposal identifiers must be unique', () => {
+  const plan = validatePlan({
+    routines: [
+      { id: 'same', name: 'A', ex: [{ id: '0001', sets: 3, reps: 10 }] },
+      { id: 'same', name: 'B', ex: [{ id: '0009', sets: 3, reps: 10 }] }
+    ]
+  });
+  assert.equal(plan.ok, false);
+  assert.ok(plan.errors.some(e => e.includes('unique')));
+  const changes = review([change({ id: 'duplicate' }), change({ id: 'duplicate', type: 'reps', after: 12 })]);
+  assert.equal(changes.ok, false);
+  assert.ok(changes.errors.some(e => e.includes('duplicated')));
 });
 
 test('the week may only point at routines the plan actually defines', () => {

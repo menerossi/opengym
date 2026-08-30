@@ -33,12 +33,14 @@ export default {
     return { ok: true, version: SDK_VERSION };
   },
 
-  async invoke({ prompt, jobDir, env, model, timeoutMs }) {
+  async invoke({ prompt, jobDir, env, model, timeoutMs, signal }) {
     let text = '';
     let failure = '';
     let stderr = '';
     let timedOut = false;
     const abortController = new AbortController();
+    const cancel = () => abortController.abort();
+    signal?.addEventListener('abort', cancel, { once: true });
     const timer = setTimeout(() => {
       timedOut = true;
       abortController.abort();
@@ -81,6 +83,7 @@ export default {
       };
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
     }
 
     if (timedOut) return { code: -1, text: '', stderr: 'the Agent SDK timed out', timedOut: true, spawnError: false };

@@ -240,7 +240,8 @@ function cleanWorkout(w) {
  */
 export function build(S, uid, opts = {}) {
   const coach = S.coach || {};
-  const profile = opts.intake || coach.profile || null;
+  const rawProfile = opts.intake || coach.profile || null;
+  const profile = rawProfile && typeof rawProfile === 'object' && !Array.isArray(rawProfile) ? rawProfile : null;
   const p = {
     coach_contract: CONTRACT,
     task: opts.kind === 'review' ? 'review' : 'create',
@@ -255,13 +256,13 @@ export function build(S, uid, opts = {}) {
       goal: profile.goal || null,
       experience: profile.experience || null,
       daysPerWeek: profile.daysPerWeek || null,
-      preferredDays: profile.preferredDays || [],
+      preferredDays: Array.isArray(profile.preferredDays) ? profile.preferredDays.slice(0, 7) : [],
       sessionMin: profile.sessionMin || null,
-      equipment: profile.equipment || [],
-      limitations: profile.limitations || '',
-      likes: profile.likes || '',
-      dislikes: profile.dislikes || '',
-      notes: profile.notes || ''
+      equipment: Array.isArray(profile.equipment) ? profile.equipment.slice(0, 20) : [],
+      limitations: String(profile.limitations || '').slice(0, 600),
+      likes: String(profile.likes || '').slice(0, 300),
+      dislikes: String(profile.dislikes || '').slice(0, 300),
+      notes: String(profile.notes || '').slice(0, 600)
     } : null,
     plan: cleanPlan(S)
   };

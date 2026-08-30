@@ -73,6 +73,7 @@ export function validatePlan(data, ctx = {}) {
     .slice(0, 20)
     .map(c => ({ id: clampStr(c.id, 40), n: clampStr(c.n, 60), bp: clampStr(c.bp || 'waist', 30), ...(c.desc ? { desc: clampStr(c.desc, 400) } : {}) }));
   const proposedIds = new Set(customEx.map(c => c.id));
+  if (proposedIds.size !== customEx.length) errors.push('customEx ids must be unique');
 
   const routines = [];
   (Array.isArray(data.routines) ? data.routines : []).slice(0, MAX_ROUTINES).forEach((r, ri) => {
@@ -126,6 +127,7 @@ export function validatePlan(data, ctx = {}) {
 
   // The week may only point at routines this bundle actually defines.
   const known = new Set(routines.map(r => r.id));
+  if (known.size !== routines.length) errors.push('routine ids must be unique');
   const week = {};
   Object.entries(data.week || {}).forEach(([d, rid]) => {
     const day = +d;
@@ -175,6 +177,7 @@ export function validateReview(data, plan) {
   const errors = [];
   const routines = new Map((plan?.routines || []).map(r => [r.id, r]));
   const changes = [];
+  const changeIds = new Set();
   const list = Array.isArray(data.changes) ? data.changes : null;
   if (!list) return fail(['changes must be an array (or set "nochange": true with a "reading")']);
 
@@ -202,8 +205,11 @@ export function validateReview(data, plan) {
       }
     }
 
+    const changeId = isStr(c.id) ? clampStr(c.id, 40) : 'c' + i;
+    if (changeIds.has(changeId)) { errors.push(`${where}.id "${changeId}" is duplicated`); return; }
+    changeIds.add(changeId);
     const out = {
-      id: isStr(c.id) ? clampStr(c.id, 40) : 'c' + i,
+      id: changeId,
       type: c.type,
       target: {
         ...(target.routineId ? { routineId: target.routineId } : {}),
@@ -340,4 +346,4 @@ export function validateReview(data, plan) {
 function fail(errors) { return { ok: false, errors }; }
 
 /** Contract-version guard: a payload we understand answered by something we don't. */
-export const contractOK = data => !data?.coach_contract || data.coach_contract === CONTRACT;
+export const contractOK = data => data?.coach_contract === CONTRACT;

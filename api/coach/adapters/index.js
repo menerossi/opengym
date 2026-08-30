@@ -28,7 +28,7 @@ const codex = {
     if (r.spawnError) return { ok: false, error: 'the Codex CLI is not installed in this container' };
     return r.code === 0 ? { ok: true, version: (r.stdout || '').trim().split('\n')[0] } : { ok: false, error: (r.stderr || '').trim().slice(0, 200) };
   },
-  async invoke({ prompt, jobDir, env, model, timeoutMs }) {
+  async invoke({ prompt, jobDir, env, model, timeoutMs, signal }) {
     // The managed config grants spawned commands read access only to this job directory and
     // minimal runtime files; it explicitly denies /codex, where Codex itself keeps its auth
     // cache. Keep sessions ephemeral and ignore project-level exec rules. The prompt is data on
@@ -36,7 +36,7 @@ const codex = {
     const argv = ['exec', '--strict-config', '--skip-git-repo-check', '--ephemeral', '--ignore-rules', '-c', 'cli_auth_credentials_store="file"'];
     for (const feature of CODEX_DISABLED_FEATURES) argv.push('--disable', feature);
     if (model) argv.push('-m', model);
-    const r = await run(CODEX_BIN, argv, { stdin: prompt, env, cwd: jobDir, timeoutMs });
+    const r = await run(CODEX_BIN, argv, { stdin: prompt, env, cwd: jobDir, timeoutMs, signal });
     return { ...r, text: (r.stdout || '').trim() };
   }
 };
@@ -51,12 +51,13 @@ const fixture = {
   id: 'fixture',
   cli: process.execPath,
   async check() { return { ok: true, version: 'fixture' }; },
-  async invoke({ prompt, jobDir, env, timeoutMs }) {
+  async invoke({ prompt, jobDir, env, timeoutMs, signal }) {
     const r = await run(process.execPath, [FIXTURE], {
       stdin: prompt, cwd: jobDir, timeoutMs,
       // The fixture needs its mode knob, which the sanitised job env deliberately drops.
       env: { ...env, FIXTURE_MODE: process.env.FIXTURE_MODE || '' },
-      asCoach: false   // a temp dir owned by root in tests; the fixture reads only stdin anyway
+      asCoach: false,  // a temp dir owned by root in tests; the fixture reads only stdin anyway
+      signal
     });
     return { ...r, text: (r.stdout || '').trim() };
   }

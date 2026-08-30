@@ -97,7 +97,7 @@ export default {
     }
   },
 
-  async invoke({ prompt, jobDir, env, model, timeoutMs }) {
+  async invoke({ prompt, jobDir, env, model, timeoutMs, signal }) {
     const key = env.OPENROUTER_API_KEY;
     if (!key) {
       return { code: -1, text: '', stderr: 'OPENROUTER_API_KEY is not set in the job environment', timedOut: false, spawnError: true };
@@ -106,6 +106,8 @@ export default {
     const messages = toMessages(prompt);
     const timeout = Math.min(timeoutMs || TIMEOUT_SOFT, TIMEOUT_SOFT);
     const controller = new AbortController();
+    const cancel = () => controller.abort();
+    signal?.addEventListener('abort', cancel, { once: true });
     const timer = setTimeout(() => controller.abort(), timeout);
 
     let text = '', stderr = '', timedOut = false;
@@ -171,6 +173,7 @@ export default {
       return { code: -1, text: '', stderr, timedOut: false, spawnError: true };
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
     }
   }
 };

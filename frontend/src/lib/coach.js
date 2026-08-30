@@ -30,6 +30,7 @@ export const emptyCoach = () => ({
   consent: null, profile: null, cadence: 'off', lastReview: null, log: [], snapshots: []
 })
 const coachOf = s => (s.coach = s.coach || emptyCoach())
+const handled = (s, proposalId) => !!proposalId && (coachOf(s).log || []).some(e => e.proposalId === proposalId)
 
 /* ============================ gating ============================ */
 
@@ -221,6 +222,7 @@ function trim(s) {
  */
 export function applyCreatedPlan(s, proposal, { schedule } = {}) {
   validateProposal(proposal)
+  if (handled(s, proposal.id)) return { routines: 0, alreadyApplied: true }
   pushSnapshot(s, proposal.id, t('Before the Coach’s plan'))
   const bundle = proposal.bundle
   // The Coach's `why` texts are for the review screen; they have no place in the routine data.
@@ -343,6 +345,7 @@ function need(x) { if (!x) throw new Error('missing target'); return x }
  */
 export function applyChangeSet(s, proposal, acceptedIds) {
   validateProposal(proposal)
+  if (handled(s, proposal.id)) return { applied: 0, alreadyApplied: true }
   const accepted = new Set(acceptedIds || [])
   const changes = (proposal.changes || []).filter(c => accepted.has(c.id) && c.status !== 'stale')
   if (!changes.length) return { applied: 0 }
@@ -368,12 +371,14 @@ export function applyChangeSet(s, proposal, acceptedIds) {
 
 /** Turned down whole, or expired: recorded so a later review knows not to re-propose it. */
 export function recordDismissal(s, proposal) {
+  if (handled(s, proposal.id)) return false
   appendLog(s, {
     kind: proposal.kind === 'create' ? 'create' : 'review', at: Date.now(), proposalId: proposal.id,
     summary: proposal.summary || '', dismissed: true,
     decisions: (proposal.changes || []).map(c => ({ id: c.id, type: c.type, why: c.why, status: 'rejected' }))
   })
   if (proposal.kind !== 'create') coachOf(s).lastReview = { at: Date.now() }
+  return true
 }
 
 /* ============================ display helpers ============================ */

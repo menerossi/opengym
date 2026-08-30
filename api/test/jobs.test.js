@@ -73,6 +73,17 @@ test('the daily cap is enforced and reported as its own failure', async () => {
   cfg.save({ caps: { perProfileDaily: 10, instanceDaily: 0 } });
 });
 
+test('the instance cap reserves queued work instead of waiting for completion', async () => {
+  const first = 'u-instance-cap-1', second = 'u-instance-cap-2';
+  writeState(DIR, first, sampleState());
+  writeState(DIR, second, sampleState());
+  cfg.save({ caps: { perProfileDaily: 10, instanceDaily: 1 }, usage: { date: null, count: 0 } });
+  jobs.enqueue(first, { kind: 'review' });
+  assert.throws(() => jobs.enqueue(second, { kind: 'review' }), e => e.code === 'cap');
+  await settle(first);
+  cfg.save({ caps: { perProfileDaily: 10, instanceDaily: 0 } });
+});
+
 test('a malformed answer is repaired once, then accepted', async () => {
   const uid = 'u-repair';
   writeState(DIR, uid, sampleState());
@@ -118,6 +129,8 @@ test('nothing worth changing produces no proposal and nothing to notify about', 
   delete process.env.FIXTURE_MODE;
   assert.equal(lastOutcome(uid).outcome, 'nochange');
   assert.equal(s.pending, null);
+  assert.equal(s.result.outcome, 'nochange');
+  assert.match(s.result.reading, /keep logging/i);
 });
 
 test('resolving a proposal records the decision and clears it', async () => {
@@ -125,10 +138,24 @@ test('resolving a proposal records the decision and clears it', async () => {
   writeState(DIR, uid, sampleState());
   jobs.enqueue(uid, { kind: 'review' });
   const s = await settle(uid);
-  jobs.resolvePending(uid, { accepted: [s.pending.changes[0].id], rejected: [] });
+  jobs.resolvePending(uid, { proposalId: s.pending.id, accepted: [s.pending.changes[0].id], rejected: [] });
   assert.equal(jobs.status(uid).pending, null);
   assert.equal(lastOutcome(uid).outcome, 'applied');
   assert.equal(lastOutcome(uid).accepted, 1);
+  assert.equal(jobs.resolvePending(uid, { proposalId: s.pending.id }).alreadyResolved, true);
+});
+
+test('a late decision cannot clear a newer proposal', async () => {
+  const uid = 'u-stale-resolve';
+  writeState(DIR, uid, sampleState());
+  jobs.enqueue(uid, { kind: 'review' });
+  const first = await settle(uid);
+  const oldId = first.pending.id;
+  jobs.resolvePending(uid, { proposalId: oldId, dismissed: true });
+  jobs.enqueue(uid, { kind: 'review' });
+  const second = await settle(uid);
+  assert.throws(() => jobs.resolvePending(uid, { proposalId: oldId, dismissed: true }), e => e.code === 'stale');
+  assert.equal(jobs.status(uid).pending.id, second.pending.id);
 });
 
 test('an expired proposal disappears on read rather than lingering forever', async () => {
@@ -152,6 +179,32 @@ test('forgetting a profile leaves no server-side residue', async () => {
   const s = jobs.status(uid);
   assert.equal(s.pending, null);
   assert.deepEqual(jobs.readUser(uid).history, []);
+  assert.throws(() => jobs.enqueue(uid, { kind: 'review' }), e => e.code === 'consent');
+});
+
+test('forgetting while a provider is running cancels it and does not recreate residue', async () => {
+  const uid = 'u-forget-running';
+  writeState(DIR, uid, sampleState());
+  process.env.FIXTURE_MODE = 'timeout';
+  jobs.enqueue(uid, { kind: 'review' });
+  const until = Date.now() + 2000;
+  while (Date.now() < until && jobs.status(uid).job?.phase !== 'contacting') await new Promise(r => setTimeout(r, 10));
+  jobs.clearUser(uid);
+  delete process.env.FIXTURE_MODE;
+  await new Promise(r => setTimeout(r, 75));
+  assert.equal(jobs.status(uid).pending, null);
+  assert.deepEqual(jobs.readUser(uid).history, []);
+});
+
+test('a scheduled run covers the current workout cursor exactly once', async () => {
+  const uid = 'u-scheduled-cursor';
+  const S = sampleState();
+  writeState(DIR, uid, S);
+  jobs.enqueue(uid, { kind: 'review', trigger: 'scheduled' });
+  await settle(uid);
+  assert.equal(jobs.scheduledCovered(uid, S), true);
+  S.workouts.push({ id: 'w2', d: '2026-07-22', end: Date.now(), entries: [] });
+  assert.equal(jobs.scheduledCovered(uid, S), false);
 });
 
 test('a job interrupted by a restart is reported as failed, not left spinning', () => {

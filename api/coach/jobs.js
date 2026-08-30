@@ -34,7 +34,7 @@ const HISTORY_MAX = 20;
 
 const safe = uid => String(uid).replace(/[^a-zA-Z0-9_-]/g, '');
 const userFile = uid => path.join(COACH_DIR, safe(uid) + '.json');
-const EMPTY = { daily: null, current: null, pending: null, history: [] };
+const EMPTY = { daily: null, current: null, pending: null, lastResult: null, scheduled: null, history: [] };
 
 export function readUser(uid) {
   try { return { ...EMPTY, ...JSON.parse(fs.readFileSync(userFile(uid), 'utf8')) }; }
@@ -53,6 +53,14 @@ function patchUser(uid, patch) {
 }
 /** Consent revoked, profile deleted, "reset everything" — no server-side residue (FR-51). */
 export function clearUser(uid) {
+  revokedAt.set(uid, Date.now());
+  cancelEpoch.set(uid, (cancelEpoch.get(uid) || 0) + 1);
+  const controller = controllers.get(uid);
+  if (controller) controller.abort();
+  for (let i = queue.length - 1; i >= 0; i--) {
+    if (queue[i].uid === uid) queue.splice(i, 1);
+  }
+  inflight.delete(uid);
   try { fs.unlinkSync(userFile(uid)); } catch { /* nothing to clear */ }
 }
 
@@ -77,11 +85,6 @@ export function capState(uid) {
   const used = rec.daily?.date === todayISO() ? rec.daily.count : 0;
   return { used, limit: caps.perProfileDaily || 0 };
 }
-function instanceUsedToday() {
-  const d = todayISO();
-  return (cfgStore.load().log || []).filter(e => (e.at || '').slice(0, 10) === d).length;
-}
-
 /* ---------- status ---------- */
 
 /** What the client polls. Expiry is enforced lazily here rather than on a timer. */
@@ -98,6 +101,7 @@ export function status(uid) {
       startedAt: rec.current.startedAt, updatedAt: rec.current.updatedAt || rec.current.startedAt
     } : null,
     pending: rec.pending || null,
+    result: rec.lastResult || null,
     cap: capState(uid)
   };
 }
@@ -113,6 +117,9 @@ function archive(uid, rec, outcome) {
 const queue = [];
 let running = 0;
 const inflight = new Set();     // uids with a job queued or running (FR-07 single-flight)
+const cancelEpoch = new Map();
+const controllers = new Map();
+const revokedAt = new Map();
 
 class CoachError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -130,12 +137,19 @@ export function enqueue(uid, opts) {
   const S = readState(uid);
   // Consent is enforced here, server-side, not by the screen that collects it: a UI-only gate
   // is not a gate (FR-08/13).
-  if (!S?.coach?.consent?.agreedAt) throw new CoachError('consent', 'the Coach needs your go-ahead first');
+  if (!S?.coach?.consent?.agreedAt || S.coach.consent.version !== 1) {
+    throw new CoachError('consent', 'the Coach needs your current go-ahead first');
+  }
+  const revoked = revokedAt.get(uid) || 0;
+  if (revoked && Date.parse(S.coach.consent.agreedAt) <= revoked) {
+    throw new CoachError('consent', 'the Coach needs your current go-ahead first');
+  }
+  if (revoked) revokedAt.delete(uid);
 
   const caps = cfgStore.load().caps || {};
   const { used, limit } = capState(uid);
   if (limit > 0 && used >= limit) throw new CoachError('cap', 'daily limit reached');
-  if (caps.instanceDaily > 0 && instanceUsedToday() >= caps.instanceDaily) throw new CoachError('cap', 'this instance has reached its daily limit');
+  if (!cfgStore.reserveRun(caps.instanceDaily || 0)) throw new CoachError('cap', 'this instance has reached its daily limit');
 
   // Counted at enqueue, not at completion: the cap exists to bound what one profile can spend
   // of the owner's provider account, and queueing twenty jobs spends it whether or not the
@@ -151,10 +165,14 @@ export function enqueue(uid, opts) {
     note: opts.note || null,
     refine: opts.refine || null,
     state: 'queued',
+    epoch: cancelEpoch.get(uid) || 0,
     startedAt: Date.now()
   };
   inflight.add(uid);
-  patchUser(uid, { current: {
+  patchUser(uid, {
+    ...(job.trigger === 'scheduled' ? { scheduled: { at: Date.now(), workoutCursor: workoutCursor(S) } } : {}),
+    lastResult: null,
+    current: {
     id: job.id, kind: job.kind, state: 'queued', phase: 'queued',
     startedAt: job.startedAt, updatedAt: job.startedAt
   } });
@@ -174,6 +192,7 @@ function pump() {
 }
 
 function finish(job, result) {
+  if (isCanceled(job)) return;
   const rec = readUser(job.uid);
   const history = [...(rec.history || []), {
     id: job.id, kind: job.kind, trigger: job.trigger, outcome: result.outcome,
@@ -183,6 +202,11 @@ function finish(job, result) {
     ...rec,
     current: null,
     pending: result.pending !== undefined ? result.pending : rec.pending,
+    lastResult: {
+      id: job.id, kind: job.kind, outcome: result.outcome, at: Date.now(),
+      ...(result.reading ? { reading: result.reading } : {}),
+      ...(result.errorClass ? { errorClass: result.errorClass } : {})
+    },
     history
   });
   cfgStore.logJob({
@@ -222,6 +246,7 @@ export function buildPrompt(kind, payload, repair) {
 /* ---------- execution ---------- */
 
 async function execute(job) {
+  if (isCanceled(job)) return;
   setPhase(job, 'preparing');
 
   const S = readState(job.uid);
@@ -242,25 +267,30 @@ async function execute(job) {
 
   const jobDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coach-'));
   const env = cfgStore.jobEnv(jobDir);
+  const controller = new AbortController();
+  controllers.set(job.uid, controller);
   try {
+    if (isCanceled(job)) return;
     const ids = (await import('./adapters/spawn.js')).unprivilegedIds();
     if (ids) fs.chownSync(jobDir, ids.uid, ids.gid);
 
     setPhase(job, 'contacting');
-    let attempt = await invoke(adapter, cfg, payload, jobDir, env, job, null, () => setPhase(job, 'validating'));
+    let attempt = await invoke(adapter, cfg, payload, jobDir, env, job, null, () => setPhase(job, 'validating'), controller.signal);
+    if (isCanceled(job)) return;
     if (!attempt.ok && attempt.repairable) {
       // One repair round, then done (FR-48). Two failures is a provider problem, not a
       // prompting problem, and a retry loop against a paid API is a bad way to find out.
       setPhase(job, 'repairing');
       attempt = await invoke(adapter, cfg, payload, jobDir, env, job, {
         previous: attempt.raw, errors: attempt.errors
-      }, () => setPhase(job, 'validating'));
+      }, () => setPhase(job, 'validating'), controller.signal);
+      if (isCanceled(job)) return;
     }
     if (!attempt.ok) {
       return finish(job, { outcome: 'failed', errorClass: attempt.errorClass, detail: attempt.detail });
     }
     if (attempt.nochange) {
-      return finish(job, { outcome: 'nochange', pending: null, detail: null });
+      return finish(job, { outcome: 'nochange', pending: null, reading: attempt.reading, detail: null });
     }
     const pending = {
       id: job.id,
@@ -273,6 +303,7 @@ async function execute(job) {
     };
     return finish(job, { outcome: 'ready', pending });
   } finally {
+    if (controllers.get(job.uid) === controller) controllers.delete(job.uid);
     fs.rmSync(jobDir, { recursive: true, force: true });
   }
 }
@@ -285,9 +316,9 @@ function setPhase(job, phase) {
   } });
 }
 
-async function invoke(adapter, cfg, payload, jobDir, env, job, repair, onResponse) {
+async function invoke(adapter, cfg, payload, jobDir, env, job, repair, onResponse, signal) {
   const prompt = buildPrompt(job.kind, payload, repair);
-  const r = await adapter.invoke({ cfg, prompt, jobDir, env, model: cfg.model || null, timeoutMs: TIMEOUT_MS });
+  const r = await adapter.invoke({ cfg, prompt, jobDir, env, model: cfg.model || null, timeoutMs: TIMEOUT_MS, signal });
   onResponse?.();
 
   if (r.timedOut) return { ok: false, errorClass: 'timeout' };
@@ -352,9 +383,13 @@ export function hashPlan(plan) {
 /* ---------- decisions ---------- */
 
 /** The client has applied (or discarded) the pending proposal. Record it and clear. */
-export function resolvePending(uid, { accepted = [], rejected = [], dismissed = false } = {}) {
+export function resolvePending(uid, { proposalId, accepted = [], rejected = [], dismissed = false } = {}) {
   const rec = readUser(uid);
-  if (!rec.pending) return { ok: true };
+  if (!rec.pending) {
+    const previous = proposalId && (rec.history || []).find(h => h.id === proposalId && ['applied', 'dismissed'].includes(h.outcome));
+    return { ok: true, alreadyResolved: !!previous };
+  }
+  if (!proposalId || proposalId !== rec.pending.id) throw new CoachError('stale', 'that proposal is no longer pending');
   const history = [...(rec.history || []), {
     id: rec.pending.id, kind: rec.pending.kind,
     outcome: dismissed ? 'dismissed' : 'applied',
@@ -362,6 +397,21 @@ export function resolvePending(uid, { accepted = [], rejected = [], dismissed = 
   }].slice(-HISTORY_MAX);
   writeUser(uid, { ...rec, pending: null, history });
   return { ok: true };
+}
+
+const isCanceled = job => (cancelEpoch.get(job.uid) || 0) !== job.epoch;
+const workoutCursor = S => {
+  const workouts = S?.workouts || [];
+  const last = workouts[workouts.length - 1];
+  return `${workouts.length}:${last?.id || ''}:${last?.end || last?.d || ''}`;
+};
+export function hasOutstanding(uid) {
+  const rec = readUser(uid);
+  return !!(rec.current || rec.pending);
+}
+export function scheduledCovered(uid, S) {
+  const rec = readUser(uid);
+  return !!rec.scheduled?.workoutCursor && rec.scheduled.workoutCursor === workoutCursor(S);
 }
 
 /* ---------- admin test + boot recovery ---------- */

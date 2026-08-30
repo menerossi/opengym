@@ -42,7 +42,7 @@ export default function Coach() {
   const toast = useUI(s => s.toast)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
-  const { job, pending, cap, refresh } = useCoachStatus(true)
+  const { job, pending, result, cap, refresh } = useCoachStatus(true)
 
   // Gating lives in one predicate; if the instance isn't offering the Coach this route simply
   // isn't a place you can be.
@@ -98,7 +98,7 @@ export default function Coach() {
     {!consented
       ? <ConsentCard onDone={() => refresh()} />
       : <>
-        <StatusCard job={job} pending={pending} nav={nav} />
+        <StatusCard job={job} pending={pending} result={result} nav={nav} />
 
         {!job && !pending && <div className="card">
           <h2 style={{ margin: '0 0 6px' }}>{t('Ask for a review')}</h2>
@@ -200,7 +200,7 @@ function ConsentCard({ onDone }) {
 
 /* ---------------------------------- status ---------------------------------- */
 
-function StatusCard({ job, pending, nav }) {
+function StatusCard({ job, pending, result, nav }) {
   const [, tick] = useState(0)
   useEffect(() => {
     if (!job) return
@@ -252,6 +252,18 @@ function StatusCard({ job, pending, nav }) {
         </div>
       </div>
       <span className="tag acc">{t('Review')}</span>
+    </div>
+  </div>
+
+  if (result?.outcome === 'nochange') return <div className="card">
+    <div className="row" style={{ gap: 10 }}>
+      <span className="lrow-i" style={{ '--tint': 'var(--green)' }}><Icon name="check" /></span>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 600 }}>{t('Done')}</div>
+        <div className="muted small" style={{ marginTop: 3, lineHeight: 1.45 }}>
+          {result.reading || t('Done')}
+        </div>
+      </div>
     </div>
   </div>
 

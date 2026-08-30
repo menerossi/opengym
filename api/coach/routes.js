@@ -9,6 +9,7 @@ import * as oauth from './oauth.js';
 import * as jobs from './jobs.js';
 import { adapterFor } from './adapters/index.js';
 import { DATA_CATEGORIES } from './payload.js';
+import { intakeOf } from './input.js';
 
 // Job failures the user sees, in the app's own voice. The raw provider detail never reaches
 // them — it goes to the admin card, which is where someone can act on it (FR-47).
@@ -16,15 +17,20 @@ const USER_ERROR = {
   off: 'the Coach is not set up on this instance',
   busy: 'the Coach is already thinking about your training',
   cap: 'the Coach is resting — try again tomorrow',
-  consent: 'the Coach needs your go-ahead first'
+  consent: 'the Coach needs your go-ahead first',
+  stale: 'that Coach proposal is no longer pending'
 };
-const HTTP_FOR = { off: 503, busy: 409, cap: 429, consent: 403 };
+const HTTP_FOR = { off: 503, busy: 409, cap: 429, consent: 403, stale: 409 };
 
 export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
   /** Every user route starts the same way: signed in, feature on, feature reachable. */
-  const guard = (req, res) => {
+  const signedIn = (req, res) => {
     const user = readSession(req);
     if (!user) { json(res, 401, { error: 'not signed in' }); return null; }
+    return user;
+  };
+  const guard = (req, res) => {
+    const user = signedIn(req, res); if (!user) return null;
     if (!cfgStore.isEnabled() || !cfgStore.isConnected()) { json(res, 503, { error: USER_ERROR.off }); return null; }
     return user;
   };
@@ -49,7 +55,7 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
     },
 
     'GET /api/coach/status': async (req, res) => {
-      const user = guard(req, res); if (!user) return;
+      const user = signedIn(req, res); if (!user) return;
       json(res, 200, jobs.status(user.id));
     },
 
@@ -57,13 +63,17 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       const user = guard(req, res); if (!user) return;
       const body = await readBody(req);
       try {
+        const intake = intakeOf(body.intake);
         const job = jobs.enqueue(user.id, {
           kind: 'create',
-          intake: body.intake || null,
+          intake,
           refine: body.refine ? String(body.refine).slice(0, 1000) : null
         });
         json(res, 202, { job });
-      } catch (e) { failEnqueue(res, e); }
+      } catch (e) {
+        if (!(e instanceof jobs.CoachError)) return json(res, 400, { error: e.message });
+        failEnqueue(res, e);
+      }
     },
 
     'POST /api/coach/review': async (req, res) => {
@@ -76,13 +86,16 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
     },
 
     'POST /api/coach/pending/resolve': async (req, res) => {
-      const user = guard(req, res); if (!user) return;
+      const user = signedIn(req, res); if (!user) return;
       const body = await readBody(req);
-      json(res, 200, jobs.resolvePending(user.id, {
-        accepted: Array.isArray(body.accepted) ? body.accepted : [],
-        rejected: Array.isArray(body.rejected) ? body.rejected : [],
-        dismissed: !!body.dismissed
-      }));
+      try {
+        json(res, 200, jobs.resolvePending(user.id, {
+          proposalId: String(body.proposalId || ''),
+          accepted: Array.isArray(body.accepted) ? body.accepted.slice(0, 25) : [],
+          rejected: Array.isArray(body.rejected) ? body.rejected.slice(0, 25) : [],
+          dismissed: !!body.dismissed
+        }));
+      } catch (e) { failEnqueue(res, e); }
     },
 
     // Consent withdrawn, or the profile turned the Coach off: drop everything held server-side
@@ -102,7 +115,6 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       const adapter = adapterFor(cfg.provider);
       const check = adapter ? await adapter.check(cfg, cfgStore.jobEnv(process.env.TMPDIR || '/tmp')) : { ok: false, error: 'unknown provider' };
       const log = cfg.log || [];
-      const today = new Date().toISOString().slice(0, 10);
       json(res, 200, {
         disabledByEnv: cfgStore.COACH_DISABLED,
         enabled: !!cfg.enabled,
@@ -113,7 +125,7 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
         runtime: { ok: !!check.ok, version: check.version || null, error: check.error || null },
         auth: await oauth.liveAuthStatus(),
         // Counts and outcomes only — never intake answers, payloads or proposals (FR-12/A4).
-        jobsToday: log.filter(e => (e.at || '').slice(0, 10) === today).length,
+        jobsToday: cfgStore.usageToday(),
         lastSuccess: cfgStore.lastSuccess(),
         lastError: cfgStore.lastError(),
         recent: log.slice(-20).reverse().map(e => ({ at: e.at, kind: e.kind, trigger: e.trigger, outcome: e.outcome, errorClass: e.errorClass, ms: e.ms }))

@@ -42,6 +42,7 @@ const DEFAULTS = {
   model: null,
   auth: null,                                    // { type:'cli-token'|'oauth'|'apikey', data:<encrypted> }
   caps: { perProfileDaily: 10, instanceDaily: 0 },   // 0 = unlimited
+  usage: { date: null, count: 0 },
   log: []
 };
 const LOG_MAX = 100;
@@ -84,7 +85,11 @@ export function load() {
   let stored = {};
   try { stored = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { /* absent = feature off */ }
   const { customCommand: _customCommand, ...storedWithoutCustomCommand } = stored;
-  cache = { ...DEFAULTS, ...storedWithoutCustomCommand, caps: { ...DEFAULTS.caps, ...(stored.caps || {}) } };
+  cache = {
+    ...DEFAULTS, ...storedWithoutCustomCommand,
+    caps: { ...DEFAULTS.caps, ...(stored.caps || {}) },
+    usage: { ...DEFAULTS.usage, ...(stored.usage || {}) }
+  };
   // A retired provider must not leave the admin page in a state where no chip is selected, or
   // continue using its old credential. The next normal save also removes its legacy fields.
   if (!PROVIDERS[cache.provider]) {
@@ -98,6 +103,21 @@ export function save(patch) {
   cache = next;
   atomicWrite(FILE, JSON.stringify(next, null, 2), 0o600);
   return next;
+}
+
+/** Reserve one provider run at enqueue time so queued jobs count against the global cap. */
+export function reserveRun(limit = 0) {
+  const cfg = load();
+  const date = new Date().toISOString().slice(0, 10);
+  const used = cfg.usage?.date === date ? (+cfg.usage.count || 0) : 0;
+  if (limit > 0 && used >= limit) return false;
+  save({ usage: { date, count: used + 1 } });
+  return true;
+}
+
+export function usageToday() {
+  const usage = load().usage || {};
+  return usage.date === new Date().toISOString().slice(0, 10) ? (+usage.count || 0) : 0;
 }
 // Test seam: forget the in-memory copy so the next load() re-reads from disk.
 export function reset() { cache = null; keyCache = null; }

@@ -241,6 +241,15 @@ describe('accepting a subset', () => {
     expect(applyChangeSet(s, p, ['c1'])).toEqual({ applied: 0 })
   })
 
+  it('is idempotent when a pending proposal is shown again after a network failure', () => {
+    const s = JSON.parse(JSON.stringify(state()))
+    const p = proposal([change({ type: 'sets', after: 4 })])
+    expect(applyChangeSet(s, p, ['c1']).applied).toBe(1)
+    expect(applyChangeSet(s, p, ['c1'])).toEqual({ applied: 0, alreadyApplied: true })
+    expect(s.routines[0].ex[0].sets).toBe(4)
+    expect(s.coach.snapshots).toHaveLength(1)
+  })
+
   it('is all-or-nothing: a failure part-way leaves the plan exactly as it was', () => {
     const s = JSON.parse(JSON.stringify(state()))
     const before = JSON.stringify(s.routines)
@@ -324,6 +333,15 @@ describe('created plans', () => {
     expect(s.routines[0].name).toBe('Full body A')          // untouched
     expect(s.routines[2].id).not.toBe('x1')                 // fresh ids, like a plan import
     expect(s.week[1]).toBe('r1')                            // schedule left alone
+  })
+
+  it('does not duplicate a created plan when resolution has to be retried', () => {
+    const s = JSON.parse(JSON.stringify(state()))
+    const p = { id: 'p-retry', kind: 'create', bundle }
+    applyCreatedPlan(s, p, { schedule: true })
+    expect(applyCreatedPlan(s, p, { schedule: true })).toEqual({ routines: 0, alreadyApplied: true })
+    expect(s.routines).toHaveLength(4)
+    expect(s.coach.snapshots).toHaveLength(1)
   })
 
   it('replaces the week only when asked, and remaps to the new ids', () => {

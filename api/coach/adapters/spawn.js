@@ -33,12 +33,12 @@ export function unprivilegedIds() {
  * Never rejects on a non-zero exit: the caller classifies failures, and a CLI that prints a
  * useful error and exits 1 is more informative than a thrown Error with none of it.
  */
-export function run(cmd, argv, { stdin = '', env = {}, cwd, timeoutMs = 300000, asCoach = true } = {}) {
+export function run(cmd, argv, { stdin = '', env = {}, cwd, timeoutMs = 300000, asCoach = true, signal } = {}) {
   return new Promise(resolve => {
     const ids = asCoach ? unprivilegedIds() : null;
     let child;
     try {
-      child = spawn(cmd, argv, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'], ...(ids || {}) });
+      child = spawn(cmd, argv, { cwd, env, signal, stdio: ['pipe', 'pipe', 'pipe'], ...(ids || {}) });
     } catch (e) {
       resolve({ code: -1, stdout: '', stderr: e.message, spawnError: true });
       return;
@@ -53,7 +53,8 @@ export function run(cmd, argv, { stdin = '', env = {}, cwd, timeoutMs = 300000, 
       if (done) return;
       done = true;
       clearTimeout(timer);
-      resolve({ code, stdout, stderr: stderr || (err ? err.message : ''), timedOut, spawnError: !!err });
+      const canceled = !!signal?.aborted && !timedOut;
+      resolve({ code, stdout, stderr: stderr || (err ? err.message : ''), timedOut, canceled, spawnError: !!err && !canceled });
     };
     child.on('error', e => finish(-1, e));
     child.on('close', code => finish(code));
