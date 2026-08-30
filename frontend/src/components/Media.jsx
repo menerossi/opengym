@@ -34,6 +34,11 @@ export default function Media({ ex, id, compact, minimizable }) {
 }
 
 export function Thumb({ ex }) {
+  const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
   if (!ex.img) return <div className="thumb thumb-x"><Icon name="dumbbell" /></div>
-  return <img className="thumb" loading="lazy" decoding="async" src={imgSrc(ex)} alt="" />
+  if (failed) return <div className="thumb thumb-x"><Icon name="dumbbell" /></div>
+  return <span className={'thumb-wrap' + (loaded ? ' loaded' : '')}>
+    <img className="thumb" loading="lazy" decoding="async" src={imgSrc(ex)} alt="" onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />
+  </span>
 }
