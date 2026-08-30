@@ -32,6 +32,7 @@ test('OpenRouter sends a sufficient completion budget and separates rules from p
   assert.equal(request.body.model, 'openai/test-model');
   assert.equal(request.body.max_completion_tokens, 16384);
   assert.equal(Object.hasOwn(request.body, 'max_tokens'), false);
+  assert.deepEqual(request.body.reasoning, { effort: 'minimal', exclude: true });
   assert.equal(request.body.messages[0].role, 'system');
   assert.equal(request.body.messages[0].content, 'System rules');
   assert.equal(request.body.messages[1].role, 'user');

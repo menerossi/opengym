@@ -91,7 +91,12 @@ export default {
         model: model || undefined,  // undefined = OpenRouter chooses the default for the account
         messages,
         temperature: 0,
-        max_completion_tokens: MAX_COMPLETION_TOKENS
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
+        // Some OpenRouter models default to spending most of the completion budget on hidden
+        // reasoning (up to ~95% at max effort). The Coach needs a complete JSON document more
+        // than a long chain of thought, so leave the model a predictable majority for output.
+        // OpenRouter maps unsupported effort levels to the closest one a model accepts.
+        reasoning: { effort: 'minimal', exclude: true }
       };
 
       const res = await fetch(`${BASE_URL}/chat/completions`, {
