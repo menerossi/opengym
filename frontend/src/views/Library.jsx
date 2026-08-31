@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore.js'
 import { EXDB, BODYPARTS, allExercises, equipmentOf } from '../lib/exercises.js'
 import { bestWeightFor } from '../lib/history.js'
 import { fmtNum } from '../lib/format.js'
-import { t } from '../lib/i18n.js'
+import { t, exerciseName } from '../lib/i18n.js'
 import { Thumb } from '../components/Media.jsx'
 import { exerciseDetailSheet, addToRoutineSheet, customExSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
@@ -17,7 +17,7 @@ export default function Library() {
   const [shown, setShown] = useState(40)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const ql = q.toLowerCase().trim()
-  const base = allExercises(S).filter(e => (!bp || e.bp === bp) && (!ql || e.n.toLowerCase().includes(ql) || e.tg.includes(ql) || e.eq.includes(ql) || (e.desc || '').toLowerCase().includes(ql)))
+  const base = allExercises(S).filter(e => (!bp || e.bp === bp) && (!ql || exerciseName(e).toLowerCase().includes(ql) || e.n.toLowerCase().includes(ql) || e.tg.includes(ql) || e.eq.includes(ql) || (e.desc || '').toLowerCase().includes(ql)))
   const eqOpts = equipmentOf(base)
   // Drop the equipment filter if the search narrowed it away, so you never hit a dead end.
   const eqOn = eqOpts.includes(eq) ? eq : ''
@@ -51,7 +51,7 @@ export default function Library() {
         return <div key={e.id} className="item exercise-item">
           <button className="item-main" onClick={() => exerciseDetailSheet(e)}>
             <Thumb ex={e} />
-            <span className="grow"><span className="tt capitalize">{e.n}</span><span className="ss capitalize">{t(e.tg || e.bp)} · {t(e.eq)}</span></span>
+            <span className="grow"><span className="tt capitalize">{exerciseName(e)}</span><span className="ss capitalize">{t(e.tg || e.bp)} · {t(e.eq)}</span></span>
             {best > 0 && <span className="tag acc">{fmtNum(best)}</span>}
           </button>
           <Button size="sm" variant="tinted" icon="plus" onClick={ev => { ev.stopPropagation(); addToRoutineSheet(e) }}>{t('Plan')}</Button>
