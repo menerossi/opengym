@@ -64,7 +64,11 @@ export default function CoachIntake() {
   const canNext = key !== 'goal' || (p.goal && p.experience)
   const last = step === STEPS.length - 1
 
-  const save = () => { update(s => { const c = (s.coach = s.coach || emptyCoach()); c.profile = p }) }
+  const save = () => { update(s => {
+    const c = (s.coach = s.coach || emptyCoach())
+    if (JSON.stringify(c.profile || null) !== JSON.stringify(p)) c.profilePrevious = c.profile || null
+    c.profile = p
+  }) }
 
   const finish = async () => {
     save()

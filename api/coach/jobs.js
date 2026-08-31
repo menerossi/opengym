@@ -34,7 +34,7 @@ const HISTORY_MAX = 20;
 
 const safe = uid => String(uid).replace(/[^a-zA-Z0-9_-]/g, '');
 const userFile = uid => path.join(COACH_DIR, safe(uid) + '.json');
-const EMPTY = { daily: null, current: null, pending: null, lastResult: null, scheduled: null, history: [] };
+const EMPTY = { daily: null, current: null, pending: null, lastResult: null, scheduled: null, reviewedProfile: null, history: [] };
 
 export function readUser(uid) {
   try { return { ...EMPTY, ...JSON.parse(fs.readFileSync(userFile(uid), 'utf8')) }; }
@@ -202,6 +202,7 @@ function finish(job, result) {
     ...rec,
     current: null,
     pending: result.pending !== undefined ? result.pending : rec.pending,
+    reviewedProfile: result.reviewedProfile !== undefined ? result.reviewedProfile : rec.reviewedProfile,
     lastResult: {
       id: job.id, kind: job.kind, outcome: result.outcome, at: Date.now(),
       ...(result.reading ? { reading: result.reading } : {}),
@@ -256,13 +257,15 @@ async function execute(job) {
   const adapter = adapterFor(cfg.provider);
   if (!adapter) return finish(job, { outcome: 'failed', errorClass: 'off' });
 
-  const pendingCreate = job.refine ? readUser(job.uid).pending : null;
+  const userRec = readUser(job.uid);
+  const pendingCreate = job.refine ? userRec.pending : null;
   const payload = payloadLib.build(S, job.uid, {
     kind: job.kind,
     intake: job.intake,
     note: job.note,
     refine: job.refine,
-    previous: pendingCreate?.bundle || null
+    previous: pendingCreate?.bundle || null,
+    previousProfile: job.kind === 'review' ? (userRec.reviewedProfile || S.coach?.profilePrevious || null) : null
   });
 
   const jobDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coach-'));
@@ -290,7 +293,10 @@ async function execute(job) {
       return finish(job, { outcome: 'failed', errorClass: attempt.errorClass, detail: attempt.detail });
     }
     if (attempt.nochange) {
-      return finish(job, { outcome: 'nochange', pending: null, reading: attempt.reading, detail: null });
+      return finish(job, {
+        outcome: 'nochange', pending: null, reading: attempt.reading,
+        reviewedProfile: payload.coachProfile, detail: null
+      });
     }
     const pending = {
       id: job.id,
@@ -301,7 +307,7 @@ async function execute(job) {
       iteration: job.refine ? (pendingCreate?.iteration || 1) + 1 : 1,
       ...attempt.result
     };
-    return finish(job, { outcome: 'ready', pending });
+    return finish(job, { outcome: 'ready', pending, reviewedProfile: payload.coachProfile });
   } finally {
     if (controllers.get(job.uid) === controller) controllers.delete(job.uid);
     fs.rmSync(jobDir, { recursive: true, force: true });

@@ -48,6 +48,18 @@ test('review payload carries the plan, the window, effort and aggregates', () =>
   assert.ok(Array.isArray(p.library) && p.library.length > 0);
 });
 
+test('review payload makes profile edits explicit evidence', () => {
+  const S = sampleState();
+  const previousProfile = payload.build(S, 'u1', { kind: 'review' }).coachProfile;
+  S.coach.profile = { ...S.coach.profile, daysPerWeek: 4, sessionMin: 30, limitations: 'no overhead pressing' };
+  const p = payload.build(S, 'u1', {
+    kind: 'review',
+    previousProfile
+  });
+  assert.deepEqual(p.profileChanges.map(c => c.field), ['daysPerWeek', 'sessionMin', 'limitations']);
+  assert.deepEqual(p.profileChanges[0], { field: 'daysPerWeek', before: 3, after: 4 });
+});
+
 test('a stalling exercise shows up in the aggregates the way the engine counts it', () => {
   const S = sampleState();
   // Three sessions that all fell short of the 10-rep target.

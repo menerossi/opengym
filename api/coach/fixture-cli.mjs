@@ -42,7 +42,7 @@ function payload() {
 const P = payload();
 const kind = P.task || (/change-set/i.test(prompt) ? 'review' : 'create');
 
-if (MODE === 'nochange' || (kind === 'review' && !(P.window?.workouts || []).length)) {
+if (MODE === 'nochange' || (kind === 'review' && !(P.window?.workouts || []).length && !P.profileChanges?.length)) {
   out({ coach_contract: 1, nochange: true, reading: 'Not enough new training to read anything into yet — keep logging and ask again in a week.' });
 }
 

@@ -46,6 +46,19 @@ test('a creation job produces a plan bundle in the app\'s own share format', asy
   assert.equal(lastOutcome(uid).outcome, 'ready');
   assert.equal(s.pending.bundle.opengym_plan, 1);
   assert.ok(s.pending.bundle.routines.length > 0);
+  assert.equal(jobs.readUser(uid).reviewedProfile.daysPerWeek, 3, 'creation establishes the profile baseline');
+});
+
+test('the first review after an edit uses the one-shot previous profile from synced state', async () => {
+  const uid = 'u-first-profile-edit';
+  const S = sampleState();
+  S.coach.profilePrevious = { ...S.coach.profile, daysPerWeek: 3, sessionMin: 45 };
+  S.coach.profile = { ...S.coach.profile, daysPerWeek: 4, sessionMin: 30 };
+  writeState(DIR, uid, S);
+  jobs.enqueue(uid, { kind: 'review' });
+  await settle(uid);
+  assert.equal(jobs.readUser(uid).reviewedProfile.daysPerWeek, 4);
+  assert.equal(jobs.readUser(uid).reviewedProfile.sessionMin, 30);
 });
 
 test('no consent, no job — the gate is on the server, not the screen', () => {
@@ -131,6 +144,22 @@ test('nothing worth changing produces no proposal and nothing to notify about', 
   assert.equal(s.pending, null);
   assert.equal(s.result.outcome, 'nochange');
   assert.match(s.result.reading, /keep logging/i);
+  assert.equal(jobs.readUser(uid).reviewedProfile.daysPerWeek, 3);
+});
+
+test('a later profile edit is remembered as new review evidence', async () => {
+  const uid = 'u-profile-change';
+  const S = sampleState();
+  writeState(DIR, uid, S);
+  jobs.enqueue(uid, { kind: 'review' });
+  const first = await settle(uid);
+  jobs.resolvePending(uid, { proposalId: first.pending.id, dismissed: true });
+  S.coach.profile = { ...S.coach.profile, daysPerWeek: 4, sessionMin: 30 };
+  writeState(DIR, uid, S);
+  jobs.enqueue(uid, { kind: 'review' });
+  await settle(uid);
+  assert.equal(jobs.readUser(uid).reviewedProfile.daysPerWeek, 4);
+  assert.equal(jobs.readUser(uid).reviewedProfile.sessionMin, 30);
 });
 
 test('resolving a proposal records the decision and clears it', async () => {

@@ -1,10 +1,17 @@
 # Task: review their training and propose plan changes
 
-Read `window` (what they actually did), `aggregates` (stalls, adherence, coverage), `bodyweight`, and `userNote` if present. Then decide whether the **plan** should change.
+Read `window` (what they actually did), `aggregates` (stalls, adherence, coverage), `bodyweight`, `profileChanges`, and `userNote` if present. Then decide whether the **plan** should change.
 
 ## How to decide
 
 Change something when the data says so:
+
+- `profileChanges` is direct evidence from the user, not a weak hint. If their available days,
+  session duration, equipment, goal, limitations, likes or dislikes changed, adapt the plan to
+  the new constraint even when there are no new workouts. Cite the changed field in `why`.
+- When `profileChanges` is present, do not answer `nochange` merely because the workout window
+  is empty. `nochange` is appropriate only if the current plan already satisfies every changed
+  preference or constraint; explain that match in `reading`.
 
 - An exercise with `stalls ≥ 2`, or top sets consistently at RIR ≤ 0.5 / RPE ≥ 9.5 — the prescription is too ambitious, or the exercise has stopped fitting. Swap it, or cut a set.
 - Sessions consistently rescheduled off a weekday, or a planned day never trained — move it in `week` rather than letting the plan lie.

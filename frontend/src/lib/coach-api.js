@@ -22,7 +22,20 @@ const demo = async () => (demoMod = demoMod || await import('./coach-demo.js'))
 const S = () => useStore.getState().S
 
 export const coachStatus = async () => DEMO ? (await demo()).demoStatus() : api('/api/coach/status')
-export const requestReview = async note => DEMO ? (await demo()).demoReview(S()) : api('/api/coach/review', { method: 'POST', body: JSON.stringify({ note: note || '' }) })
+export const requestReview = async note => {
+  if (DEMO) return (await demo()).demoReview(S())
+  // Reviews are built from the server copy. Flush profile/plan/workout edits first so asking
+  // immediately after Save cannot race the normal 1.5s sync debounce and read stale data.
+  const synced = await useStore.getState().pushState()
+  if (synced === false) throw new Error('Your latest changes could not be synced before the review.')
+  const result = await api('/api/coach/review', { method: 'POST', body: JSON.stringify({ note: note || '' }) })
+  // The server has now captured the one-shot before/after delta; do not keep the old profile
+  // (which may contain superseded limitations) in synced state longer than necessary.
+  if (S().coach?.profilePrevious !== undefined) {
+    useStore.getState().update(s => { if (s.coach) delete s.coach.profilePrevious })
+  }
+  return result
+}
 export const requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake }) })
 export const refinePlan = async text => DEMO ? (await demo()).demoRefine(S()) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ refine: text }) })
 export const resolvePending = async body => DEMO ? (await demo()).demoResolve() : api('/api/coach/pending/resolve', { method: 'POST', body: JSON.stringify(body) })

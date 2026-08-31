@@ -267,6 +267,19 @@ export function build(S, uid, opts = {}) {
     plan: cleanPlan(S)
   };
 
+  // A profile edit is first-class review evidence. Without an explicit delta, a model looking
+  // mostly at workout history can miss that the available days, equipment or limitations just
+  // changed — especially when the user asks for a review immediately after editing the form.
+  if (opts.kind === 'review' && opts.previousProfile && p.coachProfile) {
+    const fields = ['goal', 'experience', 'daysPerWeek', 'preferredDays', 'sessionMin', 'equipment', 'limitations', 'likes', 'dislikes', 'notes'];
+    const changes = fields.flatMap(field => {
+      const before = opts.previousProfile[field] ?? null;
+      const after = p.coachProfile[field] ?? null;
+      return JSON.stringify(before) === JSON.stringify(after) ? [] : [{ field, before, after }];
+    });
+    if (changes.length) p.profileChanges = changes;
+  }
+
   // What the user already turned down, so the Coach does not re-propose it without new
   // evidence (FR-26). Summaries only — the log's full before/after stays on the device.
   const declined = (coach.log || [])
