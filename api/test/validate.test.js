@@ -146,6 +146,18 @@ test('a week change may only schedule a routine that exists, rest, or nothing', 
   assert.equal(review([change({ type: 'week', target: { weekday: 6 }, after: 'ghost' })]).ok, false);
 });
 
+test('equivalent weekday formats are normalised at the model boundary', () => {
+  const numeric = review([change({ type: 'week', target: { weekday: '1' }, after: 'r1' })]);
+  assert.equal(numeric.ok, true);
+  assert.equal(numeric.proposal.changes[0].target.weekday, 1);
+  const named = review([change({ type: 'week', target: { weekday: 'Monday' }, after: 'r1' })]);
+  assert.equal(named.ok, true);
+  assert.equal(named.proposal.changes[0].target.weekday, 1);
+  const sunday = review([change({ type: 'week', target: { weekday: '7' }, after: 'r1' })]);
+  assert.equal(sunday.ok, true);
+  assert.equal(sunday.proposal.changes[0].target.weekday, 0);
+});
+
 test('"nothing to change" is a first-class answer, and so is an empty change list', () => {
   const a = validateReview({ nochange: true, reading: 'Plan is working.' }, PLAN);
   assert.equal(a.nochange, true);

@@ -35,6 +35,13 @@ test('the same profile always gets the same handle, and two profiles never share
   assert.notEqual(a1, b);
 });
 
+test('Brazilian Portuguese is explicit for the model, not only an ambiguous locale code', () => {
+  const S = sampleState({ lang: 'pt-BR' });
+  const p = payload.build(S, 'u1', { kind: 'review' });
+  assert.equal(p.meta.lang, 'pt-BR');
+  assert.equal(p.meta.language, 'Brazilian Portuguese (Português do Brasil)');
+});
+
 test('review payload carries the plan, the window, effort and aggregates', () => {
   const p = payload.build(sampleState(), 'u1', { kind: 'review', note: 'shoulder pinches' });
   assert.equal(p.task, 'review');

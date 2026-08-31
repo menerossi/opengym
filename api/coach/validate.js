@@ -55,6 +55,17 @@ const isStr = v => typeof v === 'string' && v.trim().length > 0;
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const isInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 const clampStr = (v, n) => String(v == null ? '' : v).slice(0, n);
+const weekdayOf = value => {
+  if (Number.isInteger(value) && value >= 0 && value <= 6) return value;
+  const raw = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (/^[0-7]$/.test(raw)) return +raw === 7 ? 0 : +raw;
+  const names = {
+    sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2,
+    wednesday: 3, wed: 3, thursday: 4, thu: 4, friday: 5, fri: 5,
+    saturday: 6, sat: 6
+  };
+  return Object.prototype.hasOwnProperty.call(names, raw) ? names[raw] : null;
+};
 
 /* =============================== created plans =============================== */
 
@@ -208,13 +219,14 @@ export function validateReview(data, plan) {
     const changeId = isStr(c.id) ? clampStr(c.id, 40) : 'c' + i;
     if (changeIds.has(changeId)) { errors.push(`${where}.id "${changeId}" is duplicated`); return; }
     changeIds.add(changeId);
+    const weekday = weekdayOf(target.weekday);
     const out = {
       id: changeId,
       type: c.type,
       target: {
         ...(target.routineId ? { routineId: target.routineId } : {}),
         ...(target.exId ? { exId: target.exId } : {}),
-        ...(isInt(target.weekday, 0, 6) ? { weekday: target.weekday } : {})
+        ...(weekday != null ? { weekday } : {})
       },
       why: clampStr(c.why, 600),
       before: c.before ?? null,
@@ -310,7 +322,7 @@ export function validateReview(data, plan) {
         out.after = clampStr(c.after, 40);
         break;
       case 'week': {
-        if (!isInt(target.weekday, 0, 6)) { errors.push(`${where}.target.weekday must be 0-6`); return; }
+        if (weekday == null) { errors.push(`${where}.target.weekday must identify Sunday-Saturday as 0-6`); return; }
         // null/'rest' clears the day; anything else has to be a routine that exists.
         if (c.after != null && c.after !== 'rest' && !routines.has(c.after)) {
           errors.push(`${where}.after must be a routine id from the plan, "rest", or null`); return;

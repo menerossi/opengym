@@ -70,4 +70,8 @@ Prefer few, high-conviction changes over many small ones. Never propose more tha
 | `rename-routine` | `routineId` | new name |
 | `week` | `weekday` | routine id, `"rest"`, or `null` |
 
+For every `week` change, `target.weekday` must be a JSON integer using the app's exact mapping:
+`0 = Sunday`, `1 = Monday`, `2 = Tuesday`, `3 = Wednesday`, `4 = Thursday`,
+`5 = Friday`, `6 = Saturday`. Do not use quoted numbers or translated day names.
+
 `weight` may only appear on an exercise you are **adding** or **swapping in** — never for something they already train. Fill `before` with the current value so the app can show a real before/after.

@@ -248,6 +248,7 @@ export function build(S, uid, opts = {}) {
     meta: {
       profile: handle(uid),
       lang: S.lang || 'en',
+      language: S.lang === 'pt-BR' ? 'Brazilian Portuguese (Português do Brasil)' : (S.lang || 'English'),
       unit: S.unit || 'kg',
       effortScale: effortOf(S),
       today: iso(new Date())
