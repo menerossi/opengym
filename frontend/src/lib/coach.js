@@ -27,7 +27,7 @@ export const LOG_MAX = 50
 const NAMESPACE_MAX = 256 * 1024
 
 export const emptyCoach = () => ({
-  consent: null, profile: null, cadence: 'off', lastReview: null, log: [], snapshots: []
+  consent: null, profile: null, cadence: 'off', dailySummary: false, lastReview: null, log: [], snapshots: []
 })
 const coachOf = s => (s.coach = s.coach || emptyCoach())
 const handled = (s, proposalId) => !!proposalId && (coachOf(s).log || []).some(e => e.proposalId === proposalId)

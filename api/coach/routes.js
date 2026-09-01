@@ -85,6 +85,17 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       } catch (e) { failEnqueue(res, e); }
     },
 
+    'POST /api/coach/summary': async (req, res) => {
+      const user = guard(req, res); if (!user) return;
+      const body = await readBody(req);
+      try {
+        const job = jobs.enqueue(user.id, {
+          kind: 'summary', workoutId: String(body.workoutId || '').slice(0, 100)
+        });
+        json(res, job.cached ? 200 : 202, { job });
+      } catch (e) { failEnqueue(res, e); }
+    },
+
     'POST /api/coach/pending/resolve': async (req, res) => {
       const user = signedIn(req, res); if (!user) return;
       const body = await readBody(req);

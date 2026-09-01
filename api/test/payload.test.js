@@ -26,6 +26,25 @@ test('payload never carries identity, credentials or device data', () => {
   }
 });
 
+test('daily summary payload contains only the completed workout and writing preferences', () => {
+  const S = sampleState({
+    theme: 'light', targetW: 90,
+    workouts: [{ ...sampleState().workouts[0], name: 'private routine name', note: 'private workout note' }],
+    coach: { ...sampleState().coach, profile: { limitations: 'private profile note' } }
+  });
+  const p = payload.build(S, 'summary-user', { kind: 'summary', workoutId: 'w1' });
+  const json = JSON.stringify(p);
+  assert.equal(p.task, 'summary');
+  assert.equal(p.workout.d, '2026-07-20');
+  assert.equal(p.workout.entries.length, 1);
+  assert.ok(!json.includes('private profile note'));
+  assert.ok(!json.includes('private routine name'));
+  assert.ok(!json.includes('private workout note'));
+  assert.ok(!json.includes('targetW'));
+  assert.ok(!json.includes('theme'));
+  assert.equal(p.plan, undefined);
+});
+
 test('the same profile always gets the same handle, and two profiles never share one', () => {
   const S = sampleState();
   const a1 = payload.build(S, 'uid-a', { kind: 'review' }).meta.profile;

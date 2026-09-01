@@ -36,6 +36,12 @@ export const requestReview = async note => {
   }
   return result
 }
+export const requestDailySummary = async workoutId => {
+  if (DEMO) return (await demo()).demoSummary(S(), workoutId)
+  const synced = await useStore.getState().pushState()
+  if (synced === false) throw new Error('Your latest workout could not be synced before the summary.')
+  return api('/api/coach/summary', { method: 'POST', body: JSON.stringify({ workoutId }) })
+}
 export const requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake }) })
 export const refinePlan = async text => DEMO ? (await demo()).demoRefine(S()) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ refine: text }) })
 export const resolvePending = async body => DEMO ? (await demo()).demoResolve() : api('/api/coach/pending/resolve', { method: 'POST', body: JSON.stringify(body) })
@@ -50,7 +56,7 @@ export const disclosure = async () => DEMO ? (await demo()).demoDisclosure() : a
  * failing while you are mid-workout is not something to interrupt anyone about.
  */
 export function useCoachStatus(active = true) {
-  const [state, setState] = useState({ job: null, pending: null, result: null, cap: null, loading: true })
+  const [state, setState] = useState({ job: null, pending: null, summary: null, result: null, cap: null, loading: true })
   const timer = useRef(null)
 
   const refresh = useCallback(async () => {

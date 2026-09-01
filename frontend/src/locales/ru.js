@@ -1,5 +1,10 @@
 // Russian UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Daily workout summary': 'Ежедневный итог тренировки',
+  'Show a short, positive Coach note about today’s completed workout on Home.': 'Показывает на главной странице короткую позитивную заметку Тренера о сегодняшней тренировке.',
+  'Coach’s take': 'Итог от Тренера',
+  'Preparing your workout summary…': 'Готовим итог тренировки…',
+  'Great work: {0} sets across {1} exercises completed today. A solid session in the books.': 'Отличная работа: сегодня выполнено {0} подходов в {1} упражнениях. Ещё одна уверенная тренировка завершена.',
   'Sync needs attention': 'Синхронизация требует внимания',
   'This device and the server both changed. Export a backup before choosing if you may need both copies.': 'Данные на этом устройстве и сервере изменились. Перед выбором экспортируйте резервную копию, если могут понадобиться обе версии.',
   'Keep this device': 'Оставить данные устройства',

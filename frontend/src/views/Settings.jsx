@@ -176,6 +176,11 @@ export default function Settings() {
         <Row icon="sparkles" iconTint="var(--acc)" title={hasConsent(S) ? t('Open the Coach') : t('Meet the Coach')}
           subtitle={hasConsent(S) ? t('Reviews, plan design, history and controls') : t('See what it would use, then decide')}
           accessory="chevron" onClick={() => nav('/coach')} />
+        {hasConsent(S) && <Row icon="clipboard" iconTint="var(--teal)" title={t('Daily workout summary')}
+          subtitle={t('Show a short, positive Coach note about today’s completed workout on Home.')}>
+          <Switch checked={!!S.coach?.dailySummary}
+            onChange={v => update(s => { s.coach = { ...s.coach, dailySummary: v } })} />
+        </Row>}
       </Section>
     )}
 

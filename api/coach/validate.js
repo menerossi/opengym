@@ -355,6 +355,13 @@ export function validateReview(data, plan) {
   };
 }
 
+/** A home-screen note is prose-only: short, non-empty and incapable of changing state. */
+export function validateSummary(data) {
+  if (!data || typeof data !== 'object') return fail(['the answer was not an object']);
+  if (!isStr(data.summary)) return fail(['summary is required']);
+  return { ok: true, summary: clampStr(data.summary, 320) };
+}
+
 function fail(errors) { return { ok: false, errors }; }
 
 /** Contract-version guard: a payload we understand answered by something we don't. */

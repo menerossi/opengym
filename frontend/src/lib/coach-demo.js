@@ -110,7 +110,8 @@ function buildPlan(S, intake) {
 
 /* ---------------- the API surface the demo stands in for ---------------- */
 
-export const demoStatus = () => ({ job, pending, cap: { used: 0, limit: 0 } })
+let summary = null
+export const demoStatus = () => ({ job, pending, summary, cap: { used: 0, limit: 0 } })
 
 function start(kind, make) {
   if (job) throw Object.assign(new Error(t('The Coach is already thinking about your training.')), { status: 409 })
@@ -120,6 +121,24 @@ function start(kind, make) {
   return { job }
 }
 export const demoReview = S => start('review', () => buildReview(S))
+export const demoSummary = (S, workoutId) => {
+  if (summary?.workoutId === workoutId) return { job: { cached: true } }
+  if (job) throw Object.assign(new Error(t('The Coach is already thinking about your training.')), { status: 409 })
+  const workout = (S.workouts || []).find(w => w.id === workoutId)
+  job = { id: 'demo-summary', kind: 'summary', workoutId, state: 'running', startedAt: Date.now() }
+  clearTimeout(timer)
+  timer = setTimeout(() => {
+    const sets = (workout?.entries || []).reduce((n, e) => n + (e.sets || []).filter(s => s.done).length, 0)
+    const exercises = (workout?.entries || []).length
+    summary = {
+      workoutId, date: workout?.d,
+      text: t('Great work: {0} sets across {1} exercises completed today. A solid session in the books.', sets, exercises),
+      at: Date.now()
+    }
+    job = null
+  }, DELAY)
+  return { job }
+}
 export const demoPlan = (S, intake) => start('create', () => buildPlan(S, intake))
 export const demoRefine = S => start('create', () => {
   const p = buildPlan(S, null)

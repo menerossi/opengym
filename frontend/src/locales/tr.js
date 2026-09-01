@@ -1,5 +1,10 @@
 // Turkish UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Daily workout summary': 'Günlük antrenman özeti',
+  'Show a short, positive Coach note about today’s completed workout on Home.': 'Ana ekranda bugünkü antrenman hakkında kısa ve olumlu bir Koç notu gösterir.',
+  'Coach’s take': 'Koç özeti',
+  'Preparing your workout summary…': 'Antrenman özetin hazırlanıyor…',
+  'Great work: {0} sets across {1} exercises completed today. A solid session in the books.': 'Harika iş: bugün {1} egzersizde {0} set tamamladın. Sağlam bir antrenman daha bitti.',
   'Sync needs attention': 'Eşitleme ilgilenmenizi gerektiriyor',
   'This device and the server both changed. Export a backup before choosing if you may need both copies.': 'Hem bu cihazdaki hem sunucudaki veriler değişti. İki kopyaya da ihtiyacınız olabilirse seçimden önce yedek dışa aktarın.',
   'Keep this device': 'Bu cihazdaki veriyi koru',

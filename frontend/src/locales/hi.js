@@ -1,5 +1,10 @@
 // Hindi UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Daily workout summary': 'रोज़ का वर्कआउट सारांश',
+  'Show a short, positive Coach note about today’s completed workout on Home.': 'होम पर आज पूरे किए गए वर्कआउट के बारे में कोच की छोटी, सकारात्मक टिप्पणी दिखाएँ।',
+  'Coach’s take': 'कोच का सारांश',
+  'Preparing your workout summary…': 'आपके वर्कआउट का सारांश तैयार हो रहा है…',
+  'Great work: {0} sets across {1} exercises completed today. A solid session in the books.': 'बहुत बढ़िया: आज आपने {1} एक्सरसाइज़ में {0} सेट पूरे किए। एक और मजबूत सेशन पूरा हुआ।',
   'Sync needs attention': 'सिंक पर ध्यान देने की ज़रूरत है',
   'This device and the server both changed. Export a backup before choosing if you may need both copies.': 'इस डिवाइस और सर्वर दोनों में बदलाव हुए हैं। यदि दोनों प्रतियाँ चाहिए हो सकती हैं, तो चुनने से पहले बैकअप निर्यात करें।',
   'Keep this device': 'इस डिवाइस की प्रति रखें',

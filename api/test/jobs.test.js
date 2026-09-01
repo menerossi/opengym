@@ -38,6 +38,21 @@ test('a review job produces a validated, applyable proposal', async () => {
   assert.ok(s.pending.expiresAt > Date.now());
 });
 
+test('a daily summary is tied to one workout and does not create a proposal', async () => {
+  const uid = 'u-summary';
+  const S = sampleState();
+  const workoutId = S.workouts.at(-1).id;
+  writeState(DIR, uid, S);
+  jobs.enqueue(uid, { kind: 'summary', workoutId });
+  const s = await settle(uid);
+  assert.equal(lastOutcome(uid).outcome, 'summary');
+  assert.equal(s.pending, null);
+  assert.equal(s.summary.workoutId, workoutId);
+  assert.equal(s.summary.date, S.workouts.at(-1).d);
+  assert.ok(s.summary.text.length > 10);
+  assert.equal(jobs.enqueue(uid, { kind: 'summary', workoutId }).cached, true, 'the same workout is not billed twice');
+});
+
 test('a creation job produces a plan bundle in the app\'s own share format', async () => {
   const uid = 'u-create';
   writeState(DIR, uid, sampleState({ routines: [], week: {}, workouts: [] }));

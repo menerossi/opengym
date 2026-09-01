@@ -240,6 +240,33 @@ function cleanWorkout(w) {
  */
 export function build(S, uid, opts = {}) {
   const coach = S.coach || {};
+  // A daily note is deliberately the smallest Coach payload: one completed session, the
+  // preferences needed to write and format it, and only the exercise names present in it.
+  // It does not need the person's plan, body weight or intake profile to say something useful.
+  if (opts.kind === 'summary') {
+    const workout = (S.workouts || []).find(w => w.id === opts.workoutId);
+    if (!workout) throw new Error('workout not found');
+    const ids = [...new Set((workout.entries || []).map(e => e.id))];
+    const cleanedWorkout = cleanWorkout(workout);
+    // Routine names and workout notes are user-authored free text. Neither is needed for a
+    // factual celebration, so keep this automatic prompt free of an avoidable injection path.
+    delete cleanedWorkout.name;
+    delete cleanedWorkout.note;
+    return {
+      coach_contract: CONTRACT,
+      task: 'summary',
+      meta: {
+        profile: handle(uid),
+        lang: S.lang || 'en',
+        language: S.lang === 'pt-BR' ? 'Brazilian Portuguese (Português do Brasil)' : (S.lang || 'English'),
+        unit: S.unit || 'kg',
+        effortScale: effortOf(S),
+        today: iso(new Date())
+      },
+      workout: cleanedWorkout,
+      library: ids.map(id => ({ id, n: libraryName(id) })).filter(e => e.n)
+    };
+  }
   const rawProfile = opts.intake || coach.profile || null;
   const profile = rawProfile && typeof rawProfile === 'object' && !Array.isArray(rawProfile) ? rawProfile : null;
   const p = {

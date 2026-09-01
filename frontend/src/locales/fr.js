@@ -1,5 +1,10 @@
 // French UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Daily workout summary': 'Résumé quotidien de l’entraînement',
+  'Show a short, positive Coach note about today’s completed workout on Home.': 'Affiche sur l’accueil une courte note positive du Coach sur l’entraînement terminé aujourd’hui.',
+  'Coach’s take': 'Résumé du Coach',
+  'Preparing your workout summary…': 'Préparation du résumé de votre entraînement…',
+  'Great work: {0} sets across {1} exercises completed today. A solid session in the books.': 'Bravo : vous avez terminé {0} séries sur {1} exercices aujourd’hui. Une séance solide de plus.',
   'Sync needs attention': 'La synchronisation nécessite votre attention',
   'This device and the server both changed. Export a backup before choosing if you may need both copies.': 'Cet appareil et le serveur ont tous deux changé. Exportez une sauvegarde avant de choisir si vous pourriez avoir besoin des deux copies.',
   'Keep this device': 'Conserver cet appareil',

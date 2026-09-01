@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import * as cfgStore from './config.js';
 import { adapterFor } from './adapters/index.js';
 import * as payloadLib from './payload.js';
-import { extractJSON, validatePlan, validateReview, contractOK } from './validate.js';
+import { extractJSON, validatePlan, validateReview, validateSummary, contractOK } from './validate.js';
 
 const DATA = process.env.DATA_DIR || '/data';
 const COACH_DIR = path.join(DATA, 'coach');
@@ -34,7 +34,7 @@ const HISTORY_MAX = 20;
 
 const safe = uid => String(uid).replace(/[^a-zA-Z0-9_-]/g, '');
 const userFile = uid => path.join(COACH_DIR, safe(uid) + '.json');
-const EMPTY = { daily: null, current: null, pending: null, lastResult: null, scheduled: null, reviewedProfile: null, history: [] };
+const EMPTY = { daily: null, current: null, pending: null, lastResult: null, dailySummary: null, scheduled: null, reviewedProfile: null, history: [] };
 
 export function readUser(uid) {
   try { return { ...EMPTY, ...JSON.parse(fs.readFileSync(userFile(uid), 'utf8')) }; }
@@ -96,11 +96,12 @@ export function status(uid) {
   }
   return {
     job: rec.current ? {
-      id: rec.current.id, kind: rec.current.kind, state: rec.current.state,
+      id: rec.current.id, kind: rec.current.kind, workoutId: rec.current.workoutId || null, state: rec.current.state,
       phase: rec.current.phase || (rec.current.state === 'queued' ? 'queued' : 'contacting'),
       startedAt: rec.current.startedAt, updatedAt: rec.current.updatedAt || rec.current.startedAt
     } : null,
     pending: rec.pending || null,
+    summary: rec.dailySummary || null,
     result: rec.lastResult || null,
     cap: capState(uid)
   };
@@ -146,6 +147,13 @@ export function enqueue(uid, opts) {
   }
   if (revoked) revokedAt.delete(uid);
 
+  if (opts.kind === 'summary') {
+    const workout = (S.workouts || []).find(w => w.id === opts.workoutId);
+    if (!workout) throw new CoachError('missing', 'workout not found');
+    const cached = readUser(uid).dailySummary;
+    if (cached?.workoutId === workout.id) return { id: null, cached: true };
+  }
+
   const caps = cfgStore.load().caps || {};
   const { used, limit } = capState(uid);
   if (limit > 0 && used >= limit) throw new CoachError('cap', 'daily limit reached');
@@ -159,11 +167,12 @@ export function enqueue(uid, opts) {
   const job = {
     id: crypto.randomBytes(8).toString('hex'),
     uid,
-    kind: opts.kind,                                  // 'create' | 'review'
+    kind: opts.kind,                                  // 'create' | 'review' | 'summary'
     trigger: opts.trigger || 'manual',                // 'manual' | 'scheduled'
     intake: opts.intake || null,
     note: opts.note || null,
     refine: opts.refine || null,
+    workoutId: opts.workoutId || null,
     state: 'queued',
     epoch: cancelEpoch.get(uid) || 0,
     startedAt: Date.now()
@@ -173,7 +182,7 @@ export function enqueue(uid, opts) {
     ...(job.trigger === 'scheduled' ? { scheduled: { at: Date.now(), workoutCursor: workoutCursor(S) } } : {}),
     lastResult: null,
     current: {
-    id: job.id, kind: job.kind, state: 'queued', phase: 'queued',
+    id: job.id, kind: job.kind, workoutId: job.workoutId, state: 'queued', phase: 'queued',
     startedAt: job.startedAt, updatedAt: job.startedAt
   } });
   queue.push(job);
@@ -206,8 +215,12 @@ function finish(job, result) {
     lastResult: {
       id: job.id, kind: job.kind, outcome: result.outcome, at: Date.now(),
       ...(result.reading ? { reading: result.reading } : {}),
+      ...(job.workoutId ? { workoutId: job.workoutId } : {}),
       ...(result.errorClass ? { errorClass: result.errorClass } : {})
     },
+    dailySummary: result.summary ? {
+      workoutId: job.workoutId, date: result.summaryDate, text: result.summary, at: Date.now()
+    } : rec.dailySummary,
     history
   });
   cfgStore.logJob({
@@ -233,7 +246,7 @@ function promptPart(name) {
   return promptCache.get(name);
 }
 export function buildPrompt(kind, payload, repair) {
-  const task = kind === 'review' ? 'review.md' : payload.refine ? 'refine.md' : 'create.md';
+  const task = kind === 'summary' ? 'summary.md' : kind === 'review' ? 'review.md' : payload.refine ? 'refine.md' : 'create.md';
   let out = promptPart('common.md') + '\n\n---\n\n' + promptPart(task) +
     '\n\n---\n\n## Payload\n\n```json\n' + JSON.stringify(payload, null, 1) + '\n```\n';
   if (repair) {
@@ -264,6 +277,7 @@ async function execute(job) {
     intake: job.intake,
     note: job.note,
     refine: job.refine,
+    workoutId: job.workoutId,
     previous: pendingCreate?.bundle || null,
     previousProfile: job.kind === 'review' ? (userRec.reviewedProfile || S.coach?.profilePrevious || null) : null
   });
@@ -296,6 +310,12 @@ async function execute(job) {
       return finish(job, {
         outcome: 'nochange', pending: null, reading: attempt.reading,
         reviewedProfile: payload.coachProfile, detail: null
+      });
+    }
+    if (job.kind === 'summary') {
+      return finish(job, {
+        outcome: 'summary', summary: attempt.summary,
+        summaryDate: payload.workout.d, detail: null
       });
     }
     const pending = {
@@ -341,11 +361,14 @@ async function invoke(adapter, cfg, payload, jobDir, env, job, repair, onRespons
     return unusable([`coach_contract must be ${payloadLib.CONTRACT}`], r.text, repair);
   }
 
-  const v = job.kind === 'review'
-    ? validateReview(parsed.value, payload.plan)
-    : validatePlan(parsed.value, { workingWeights: payload.history?.workingWeights, daysPerWeek: payload.coachProfile?.daysPerWeek });
+  const v = job.kind === 'summary'
+    ? validateSummary(parsed.value)
+    : job.kind === 'review'
+      ? validateReview(parsed.value, payload.plan)
+      : validatePlan(parsed.value, { workingWeights: payload.history?.workingWeights, daysPerWeek: payload.coachProfile?.daysPerWeek });
 
   if (!v.ok) return unusable(v.errors, r.text, repair);
+  if (job.kind === 'summary') return { ok: true, summary: v.summary };
   if (v.nochange) return { ok: true, nochange: true, reading: v.reading };
   return { ok: true, result: v.proposal ? v.proposal : { bundle: v.bundle, summary: v.bundle.summary } };
 }

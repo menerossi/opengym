@@ -1,5 +1,10 @@
 // Simplified Chinese UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Daily workout summary': '每日训练总结',
+  'Show a short, positive Coach note about today’s completed workout on Home.': '在主页显示教练对今天已完成训练的简短积极评价。',
+  'Coach’s take': '教练总结',
+  'Preparing your workout summary…': '正在生成训练总结…',
+  'Great work: {0} sets across {1} exercises completed today. A solid session in the books.': '做得很好：今天完成了 {1} 个动作、共 {0} 组训练。又一次扎实的训练完成了。',
   'Sync needs attention': '同步需要处理',
   'This device and the server both changed. Export a backup before choosing if you may need both copies.': '此设备和服务器上的数据都已更改。如果可能需要两个副本，请在选择前导出备份。',
   'Keep this device': '保留此设备的数据',

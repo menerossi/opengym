@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { effectiveRoutine, effectiveRoutineId, streakWeeks, lastBW, setsDoneActive } from '../lib/history.js'
@@ -10,16 +10,15 @@ import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { glyphOf } from '../lib/glyphs.js'
 import { coachAvailable, hasConsent } from '../lib/coach.js'
-import { useCoachStatus } from '../lib/coach-api.js'
+import { requestDailySummary, useCoachStatus } from '../lib/coach-api.js'
 import { DEMO } from '../lib/demo.js'
 import { MOBILE } from '../lib/mobile.js'
 
 // A job in flight or a proposal waiting is the only reason the Coach interrupts Home. When it
 // has nothing to say it renders nothing at all — and it only polls while Home is on screen.
-function CoachCard({ nav }) {
-  const S = useStore(s => s.S)
-  const { job, pending } = useCoachStatus(hasConsent(S))
-  if (!hasConsent(S) || (!job && !pending)) return null
+function CoachCard({ nav, status }) {
+  const { job, pending } = status
+  if ((!job || job.kind === 'summary') && !pending) return null
   const ready = !!pending
   return <div className="card" style={ready ? { borderColor: 'var(--acc)' } : null}>
     <div className="today-row" onClick={() => nav(ready ? '/coach/proposal' : '/coach')}>
@@ -39,6 +38,37 @@ function CoachCard({ nav }) {
   </div>
 }
 
+function DailyCoachSummary({ workout, status }) {
+  const [requesting, setRequesting] = useState(false)
+  const attempted = useRef(null)
+  const { job, summary, result, refresh } = status
+  const ready = summary?.workoutId === workout.id
+  const running = job?.kind === 'summary' && job.workoutId === workout.id
+  const failed = result?.kind === 'summary' && result.workoutId === workout.id && result.outcome === 'failed'
+
+  useEffect(() => {
+    if (ready || running || failed || job || attempted.current === workout.id) return
+    attempted.current = workout.id
+    setRequesting(true)
+    requestDailySummary(workout.id)
+      .then(refresh)
+      .catch(() => setRequesting(false))
+  }, [failed, job, ready, refresh, running, workout.id])
+
+  if (failed || (!ready && !running && !requesting)) return null
+  return <div className="card">
+    <div className="row" style={{ gap: 9, alignItems: 'flex-start' }}>
+      <span className="lrow-i" style={{ background: 'var(--teal)', flexShrink: 0 }}><Icon name="sparkles" /></span>
+      <div style={{ minWidth: 0 }}>
+        <div className="lbl2">{t('Coach’s take')}</div>
+        <div className={ready ? 'small' : 'small muted'} style={{ lineHeight: 1.45 }}>
+          {ready ? summary.text : t('Preparing your workout summary…')}
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
 // Home = what to do now + a quick glance. Deep charts & history live in Stats.
 export default function Home() {
   const nav = useNavigate()
@@ -47,6 +77,8 @@ export default function Home() {
   const config = useStore(s => s.config)
   const [weekOffset, setWeekOffset] = useState(0)
   const coachOn = coachAvailable(config, user, { demo: DEMO, mobile: MOBILE })
+  const coachReady = coachOn && hasConsent(S)
+  const coachStatus = useCoachStatus(coachReady)
 
   const today = new Date()
   const todayKey = todayISO()
@@ -114,7 +146,9 @@ export default function Home() {
       </button>
     </div>
 
-    {coachOn && <CoachCard nav={nav} />}
+    {coachReady && <CoachCard nav={nav} status={coachStatus} />}
+    {coachReady && !!S.coach?.dailySummary && completedToday &&
+      <DailyCoachSummary workout={completedToday} status={coachStatus} />}
 
     {!S.routines.length && !S.active && (
       <div className="card">

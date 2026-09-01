@@ -1,5 +1,10 @@
 // Korean UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Daily workout summary': '일일 운동 요약',
+  'Show a short, positive Coach note about today’s completed workout on Home.': '홈 화면에 오늘 완료한 운동에 대한 짧고 긍정적인 코치 메모를 표시합니다.',
+  'Coach’s take': '코치 요약',
+  'Preparing your workout summary…': '운동 요약을 준비하는 중…',
+  'Great work: {0} sets across {1} exercises completed today. A solid session in the books.': '잘했어요: 오늘 {1}개 운동에서 {0}세트를 완료했습니다. 탄탄한 운동을 마쳤어요.',
   'Sync needs attention': '동기화에 확인이 필요합니다',
   'This device and the server both changed. Export a backup before choosing if you may need both copies.': '이 기기와 서버의 데이터가 모두 변경되었습니다. 두 사본이 모두 필요할 수 있다면 선택 전에 백업을 내보내세요.',
   'Keep this device': '이 기기 데이터 유지',
