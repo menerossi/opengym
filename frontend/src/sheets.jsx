@@ -883,7 +883,7 @@ function SessionRating({ w }) {
 function FinishSummary({ w, prs, e1prs = [], close }) {
   const st = useStore(s => s.S)
   const coachOn = !!useStore(s => s.config)?.coach?.enabled && !!st.coach?.consent?.agreedAt
-  return <div style={{ textAlign: 'center', padding: '8px 0' }}>
+  return <div className="finish-summary" style={{ textAlign: 'center', padding: '8px 0' }}>
     <div style={{ fontSize: 44, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="trophy" /></div>
     <h3 style={{ margin: '8px 0' }}>{t('Workout complete!')}</h3>
     <div className="tiles" style={{ textAlign: 'left' }}>
@@ -899,8 +899,9 @@ function FinishSummary({ w, prs, e1prs = [], close }) {
     <h4 className="sec" style={{ textAlign: 'left' }}>{t('What you just trained')}</h4>
     <BodyMap load={loadOfWorkouts([w])} body={st.body} />
     {coachOn && <SessionRating w={w} />}
-    <div style={{ height: 14 }} />
-    <Button variant="primary" onClick={() => { close(); nav('/home') }}>{t('Nice!')}</Button>
+    <div className="finish-action">
+      <Button variant="primary" onClick={() => { close(); nav('/home') }}>{t('Nice!')}</Button>
+    </div>
   </div>
 }
 export function finishWorkout() {
